@@ -1,5 +1,5 @@
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
-import {configureKey, complete} from './model-api.js';
+import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
 import {formatAnswer} from './answer.js';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn} from './library.js';
 import {contents} from './contents.js';
@@ -23,7 +23,7 @@ let doc, rows = [], pageNo = 1, zoom = 1, selected = null, busy = false;
 let paperId='',paperTurns=[],tocPromise=null;
 let history = [], versions = 0, observer, loadSerial = 0;
 let translationOpen = false, drawingWidth = 0, flashTimer;
-const providers = {deepseek:{ready:false,model:'deepseek-flash'},openai:{ready:false,model:'gpt-4.1-mini'}};
+const defaultModels = {deepseek:'deepseek-flash',openai:'gpt-4.1-mini'};
 const storagePrefix = new URL('.', import.meta.url).pathname + ':';
 function localGet(k) {try{return localStorage.getItem(storagePrefix+k)}catch{return null}}
 function localSet(k,v) {try{localStorage.setItem(storagePrefix+k,v);return true}catch{return false}}
@@ -43,10 +43,10 @@ function teachingQuestion(q){
   const depth=localGet('reader.depth')==='deep'?'系统说明公式、变量、假设、消融和失效条件。':'优先直觉，只用理解机制所必需的数学。';
   return [stylePrompts[styleChoice()],depth,'需要公式时用 LaTeX，以 $...$ 或 $$...$$ 分隔。','读者偏好：'+(localGet('reader.preferences')||'无'), '当前问题：'+q].join('\n');
 }
-const modelFor = p => localGet('reader.model.' + p) || providers[p].model;
+const modelFor = p => localGet('reader.model.' + p) || defaultModels[p];
 function status() {
   const p = provider;
-  $('keyStatus').textContent = styleNames[styleChoice()]+' · '+(providers[p].ready ? modelFor(p) : '请在上方配置密钥');
+  $('keyStatus').textContent = styleNames[styleChoice()]+' · '+(hasKey(p) ? modelFor(p) : '请在上方配置密钥');
   
   $('contextHint').textContent = $('scope').value === 'all' ? '全文 · ' + rows.length + ' 页' : $('scope').value === 'page' ? '原文第 ' + pageNo + ' 页' : '原文选区';
   $('send').disabled = busy || !doc;
@@ -66,23 +66,37 @@ $('notes').oninput = () => {
 if(matchMedia('(max-width:740px)').matches) panel('closed');
 function configFields() {
   const p = $('configProvider').value; $('model').value = modelFor(p); $('key').value = '';
-  $('keyHelp').textContent = (providers[p].ready ? '已填写，留空可继续使用。' : '使用自己的 API Key。') + '密钥只保留在当前标签页的内存中，刷新后需重新填写。';
+  $('rememberKey').checked = remembersKey(p);
+  $('forgetKey').hidden = !hasKey(p);
+  $('keyHelp').textContent = remembersKey(p) ? '此服务的密钥已保存在当前浏览器，重新打开可继续使用。' : hasKey(p) ? '此服务的密钥仅在当前标签页有效。' : '填入所选服务商的个人 API Key。';
   $('key').required = false; $('configError').textContent = '';
 }
-function settings() { $('configProvider').value = provider; configFields(); $('style').value=styleChoice(); $('depth').value=localGet('reader.depth')||'learn'; $('preferences').value=localGet('reader.preferences')||''; $('settingDialog').showModal(); }
+async function settings() { await keyLoad; $('configProvider').value = provider; configFields(); $('style').value=styleChoice(); $('depth').value=localGet('reader.depth')||'learn'; $('preferences').value=localGet('reader.preferences')||''; $('settingDialog').showModal(); }
 $('settings').onclick = settings;
 $('configProvider').onchange = configFields;
+$('forgetKey').onclick = async () => {
+  const p=$('configProvider').value;
+  if($('setup').inert)return;
+  $('setup').inert=true;
+  try {await forgetKey(p);configFields();status();$('keyHelp').textContent='已清除该服务的密钥。';}
+  catch { $('configError').textContent='无法清除已保存的密钥，请检查浏览器的站点存储权限。'; }
+  finally { $('setup').inert=false; }
+};
 $('setup').onsubmit = async e => {
   e.preventDefault();
+  if($('setup').inert)return;
+  $('setup').inert=true;
   const p = $('configProvider').value, key = $('key').value.trim();
   try {
-    if(key) {configureKey(p,key); providers[p].ready = true;}
+    await configureKey(p,key,$('rememberKey').checked);
     localSet('reader.model.'+p,$('model').value.trim()); provider = p; localSet('reader.provider',p);
     for(const k of ['style','depth','preferences'])localSet('reader.'+k,$(k).value);
     $('key').value=''; $('settingDialog').close(); status();
-  } catch(err){$('configError').textContent=err.message;}
+  } catch(err){$('configError').textContent=err instanceof DOMException ? '密钥设置未保存。请检查浏览器存储权限，或取消勾选后仅在本次使用。' : err.message;}
+  finally{$('setup').inert=false;}
 };
 $('settingDialog').addEventListener('close', () => {$('key').value='';});
+const keyLoad=restoreKeys().then(status).catch(()=>notice('浏览器未能读取已保存的密钥，可在 AI 设置中填写。'));
 status();
 
 function go(n) {
@@ -284,7 +298,8 @@ async function chatRequest(q, material, previous){
 }
 async function ask(question,scope=$('scope').value,n=pageNo) {
   if(busy||!doc||!question.trim())return;
-  if(!providers[provider].ready){$('question').value=question;settings();return;}
+  await keyLoad;
+  if(!hasKey(provider)){$('question').value=question;settings();return;}
   const ref=doc, model=modelFor(provider), quote=selected;
   setBusy(true);let pending,turn;
   try {
@@ -436,7 +451,8 @@ async function translateAll(){
   if(job){job.stop=true;updateTranslationAction();return;}
   if(!doc)return;
   if(rows.every(e=>e.done)){viewTranslations(!translationOpen);return;}
-  if(!providers[provider].ready){settings();return;}
+  await keyLoad;
+  if(!hasKey(provider)){settings();return;}
   const task={stop:false,provider,model:modelFor(provider)},start=pageNo-1;
   job=task;viewTranslations(true);
   const order=rows.slice(start).concat(rows.slice(0,start));
@@ -615,7 +631,8 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
   input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();form.requestSubmit();}};
   form.onsubmit=async e=>{
     e.preventDefault();const q=input.value.trim();if(!q||send.disabled)return;
-    if(!providers[provider].ready){settings();return;}
+    await keyLoad;
+    if(!hasKey(provider)){settings();return;}
     send.disabled=true;input.value='';addMessage('user',q,'你',log);
     const turn=newTurn(id,q,'你',materialScope('selection',quote.from,quote),quote);
     const label=modelFor(provider),pending=addMessage('assistant','正在阅读引文…',label,log);

@@ -10,9 +10,9 @@ test('each provider receives only its own key and selected material', async t =>
   });
   const request = {model:'example', question:'question', context:'selected text', history:[]};
   await assert.rejects(complete({...request, provider:'openai'}));
-  assert.throws(() => configureKey('unknown', 'fake'));
+  await assert.rejects(configureKey('unknown', 'fake'));
   for (const provider of ['deepseek','openai']) {
-    configureKey(provider, 'test-only-' + provider);
+    await configureKey(provider, 'test-only-' + provider);
     assert.deepEqual(await complete({...request, provider}), {answer:'answer'});
     const {url, options} = calls.at(-1);
     assert.equal(new URL(url).hostname, 'api.' + provider + '.com');
