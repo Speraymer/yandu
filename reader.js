@@ -1,5 +1,6 @@
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
 import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
+import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js';
 import {formatAnswer} from './answer.js';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn} from './library.js';
 import {contents} from './contents.js';
@@ -48,7 +49,7 @@ function status() {
   const p = provider;
   $('keyStatus').textContent = styleNames[styleChoice()]+' · '+(hasKey(p) ? modelFor(p) : '请在上方配置密钥');
   
-  $('contextHint').textContent = $('scope').value === 'all' ? '全文 · ' + rows.length + ' 页' : $('scope').value === 'page' ? '原文第 ' + pageNo + ' 页' : '原文选区';
+  $('contextHint').textContent = $('scope').value === 'all' ? '全文 · ' + rows.length + ' 页' : $('scope').value === 'page' ? '原文第 ' + pageNo + ' 页' : selected?.kind==='answer'?'AI 回答选区':'原文选区';
   $('send').disabled = busy || !doc;
 }
 function panel(name) {
@@ -224,21 +225,36 @@ function showScope(){
       selected=null;$('scope').options[2].disabled=true;$('scope').value=scopeBeforeQuote;
       $('quote').replaceChildren();showScope();$('question').focus({preventScroll:true});
     };
-    top.append(el('div','quote-preview','第 '+selected.from+' 页 · '+selected.text),remove);
+    top.append(el('div','quote-preview',quoteLabel(selected)+' · '+selected.text),remove);
     $('quote').replaceChildren(top);
     const actions=el('div','quote-actions');
     const explain=el('button','','拆解术语'),evidence=el('button','','在全文中找证据');
     explain.type=evidence.type='button';
     explain.onclick=()=>ask('找出引文中最关键的术语。用一个具体例子解释，再将例子对应回原文。','selection');
-    evidence.onclick=()=>ask('针对下列引文中的主张，在全文定位支持或限制它的实验、对照组和指标。若它是定义或动机，请说明依据类型。请引用页码。\n'+selected.text.slice(0,4800),'all');
+    evidence.onclick=()=>ask('针对以下摘录（'+quoteLabel(selected)+'）中的主张，在论文中定位支持或限制它的实验、对照组和指标。若它是定义或动机，请说明依据类型。请引用页码。\n'+selected.text.slice(0,4800),'all');
     const formula=el('button','','逐项读公式');formula.type='button';
     formula.onclick=()=>ask('逐项读这个表达式：它要求什么，变量从哪里来，每一步如何改变结果？给一个最小数值例子。原文提取若缺符号，请标出缺口。','selection');
     actions.append(explain,formula,evidence);$('quote').append(actions);
   }
   status();
 }
-$('scope').onchange=showScope;$('sheets').addEventListener('pointerup',()=>setTimeout(picked,0));$('sheets').addEventListener('keyup',picked);
+$('scope').onchange=showScope;
+for(const area of [$('sheets'),$('messages'),$('floatLayer')]){
+  area.addEventListener('pointerup',()=>setTimeout(picked,0));
+  area.addEventListener('keyup',picked);
+}
+// Mobile selection handles can move without a pointerup on the answer.
+document.addEventListener('selectionchange',()=>{
+  if(!matchMedia('(pointer: coarse)').matches)return;
+  const s=getSelection(),node=s?.anchorNode;
+  const el=node?.nodeType===1?node:node?.parentElement;
+  if(s&&!s.isCollapsed&&el?.closest('[data-answer-id]'))picked();
+});
 async function context(scope,n,selection,documentRows) {
+  if(scope==='selection'&&selection?.kind==='answer'){
+    const source=paperTurns.find(t=>t.id===selection.turnId);
+    return '【AI 回答摘录】\n'+selection.text+(source?'\n【当时的问题】\n'+source.question:'')+'\n这段文字来自先前的 AI 回答，涉及论文事实时需要核实。';
+  }
   if(scope==='selection'&&selection)return '[第'+selection.from+'页'+(selection.to!==selection.from?'至第'+selection.to+'页':'')+']\n'+selection.text+(selection.original?'\n对应原文：'+selection.original:'');
   const entries=scope==='all'?documentRows:[documentRows[n-1]];
   const parts=[];let length=0, readable=false;
@@ -251,7 +267,7 @@ async function context(scope,n,selection,documentRows) {
   if(!readable)throw Error('所选页面没有可提取的文字。扫描件请先进行 OCR。');
   return parts.join('\n\n');
 }
-function addMessage(role, value, label, target=$('messages')) {
+function addMessage(role, value, label, target=$('messages'),answerId=null) {
   if(target===$('messages')) welcome.remove(); const msg=el('article','msg '+role);msg.append(el('small','',label));const body=el('div');msg.append(body);
   for(const part of value.split(/(\[第\s*\d+\s*页\])/g)){
     const match=/^\[第\s*(\d+)\s*页\]$/.exec(part);
@@ -259,6 +275,7 @@ function addMessage(role, value, label, target=$('messages')) {
     else body.append(document.createTextNode(part));
   }
   if(role==='assistant')formatAnswer(body);
+  if(answerId)body.dataset.answerId=answerId;
   target.append(msg);
   if(role==='assistant'){
     target.scrollTop+=msg.getBoundingClientRect().top-target.getBoundingClientRect().top-6;
@@ -278,13 +295,14 @@ async function storeTurn(turn){
 }
 function replayTurn(turn,target){
   const user=addMessage('user',turn.question,turn.label,target);
-  if(turn.quote && turn.thread==='main')user.prepend(el('blockquote','',turn.quote.text));
-  const reply=addMessage('assistant',turn.answer||turn.error||'未收到完整答复，可重新提问。',turn.model,target);
+  const citation=turn.replyQuote||(turn.thread==='main'?turn.quote:null);
+  if(citation)user.prepend(quoteBlock(citation));
+  const reply=addMessage('assistant',turn.answer||turn.error||'未收到完整答复，可重新提问。',turn.model,target,turn.answer?turn.id:null);
   if(turn.answer)saveNoteButton(reply,turn.source,turn.question,turn.answer);
 }
 function recentMessages(turns){
   return turns.filter(t=>t.answer).slice(-4).flatMap(t=>[
-    {role:'user',content:((t.thread==='main'&&t.quote?'引文：'+t.quote.text+'\n':'')+t.question).slice(0,12000)},
+    {role:'user',content:(quotePrefix(t.replyQuote||(t.thread==='main'?t.quote:null))+t.question).slice(0,12000)},
     {role:'assistant',content:t.answer.slice(0,12000)}
   ]);
 }
@@ -309,14 +327,14 @@ async function ask(question,scope=$('scope').value,n=pageNo) {
     turn=newTurn('main',question,label,materialScope(scope,n,quote),scope==='selection'?quote:null);
     await storeTurn(turn);if(ref!==doc)return;
     panel('chat');const userMsg=addMessage('user',question,label);
-    if(scope==='selection' && quote)userMsg.prepend(el('blockquote','',quote.text));
+    if(scope==='selection' && quote)userMsg.prepend(quoteBlock(quote));
     $('question').value='';pending=addMessage('assistant','正在阅读原文…',model);
     const result=await chatRequest(question,material,history);
     turn.answer=result.answer;await storeTurn(turn);
     if(doc!==ref)return;
-    pending.remove();const reply=addMessage('assistant',result.answer,model);
+    pending.remove();const reply=addMessage('assistant',result.answer,model,$('messages'),turn.id);
     saveNoteButton(reply,materialScope(scope,n,quote),question,result.answer);
-    history.push({role:'user',content:(scope==='selection'?'引文：'+quote.text+'\n':'')+question},{role:'assistant',content:result.answer});
+    history.push({role:'user',content:(scope==='selection'?quotePrefix(quote):'')+question},{role:'assistant',content:result.answer});
     history=history.slice(-8).map(m=>({...m,content:m.content.slice(0,12000)}));
   }catch(err){if(turn&&!turn.answer){turn.error=err.message;await storeTurn(turn);}pending?.remove();if(doc===ref){panel('chat');addMessage('assistant',err.message,'发送失败');$('question').value=question;}}
   finally{setBusy(false);}
@@ -370,7 +388,7 @@ $('conversations').onclick=()=>{
   if(!grouped.size)$('results').textContent='这篇论文还没有问答记录。';
   for(const [id,turns] of [...grouped].reverse()){
     const latest=turns.at(-1),b=el('button','shelf-book');
-    b.append(el('span','',(id==='main'?'右栏对话':'第 '+latest.quote.from+' 页小窗')+' · '+latest.question),el('small','',turns.length+' 问'));
+    b.append(el('span','',(id==='main'?'右栏对话':quoteLabel(latest.quote)+'小窗')+' · '+latest.question),el('small','',turns.length+' 问'));
     b.onclick=()=>{$('browserDialog').close();
       if(id==='main'){panel('chat');return;}
       const existing=[...threads].find(f=>f.id===id);if(existing){$('floatLayer').append(existing.box);return;}
@@ -388,7 +406,10 @@ $('search').oninput=async()=>{
 };
 let job=null, draft=null, hoverId=null, anchorFrame=0;
 const threads=new Set();
-function materialScope(scope,n,quote){return scope==='all'?'全文':scope==='selection'?'第 '+quote.from+' 页 · '+quote.text:'第 '+n+' 页';}
+function quoteLabel(quote){return quote.kind==='answer'?'AI 回答':'第 '+quote.from+' 页';}
+function quotePrefix(quote){return quote?quoteLabel(quote)+'引文：'+quote.text+'\n':'';}
+function quoteBlock(quote){return el('blockquote','',quote.kind==='answer'?'AI 回答 · '+quote.text:quote.text);}
+function materialScope(scope,n,quote){return scope==='all'?'全文':scope==='selection'?quoteLabel(quote)+' · '+quote.text:'第 '+n+' 页';}
 function saveNoteButton(reply,source,question,answer){
   const b=el('button','clip-note','摘入笔记');
   b.onclick=()=>{
@@ -514,7 +535,10 @@ function picked(){
   const s=getSelection();
   if(!s?.rangeCount||s.isCollapsed){$('selectionTools').hidden=true;return;}
   const r=s.getRangeAt(0),text=s.toString().trim();
+  const answer=selectedAnswer(r,text);
+  if(answer){showPick(answer,r);return;}
   const elem=n=>n.nodeType===1?n:n.parentElement;
+  $('selectionTools').hidden=true;
   const a=elem(r.startContainer).closest('.sheet,.translation'),b=elem(r.endContainer).closest('.sheet,.translation');
   if(!text||!a||!b||a.className!==b.className)return;
   const isTranslation=a.classList.contains('translation'),boxes=[],original=[],pieces=[];
@@ -533,8 +557,19 @@ function picked(){
     }
   }
   if(!boxes.length)return;
-  draft={from,to,text:a===b?text:pieces.filter(Boolean).join(' '),original:original.join(' '),boxes};
+  showPick({from,to,text:a===b?text:pieces.filter(Boolean).join(' '),original:original.join(' '),boxes},r);
+}
+function showPick(quote,r){
+  draft=quote;
+  const chooser=$('existingThread');
+  chooser.hidden=quote.kind!=='answer'||!threads.size;
+  if(!chooser.hidden){
+    chooser.replaceChildren(new Option('引用到已有小窗…',''));
+    let i=0;
+    for(const f of threads)chooser.add(new Option(++i+' · '+f.quote.text.slice(0,20),f.id));
+  }
   const last=Array.from(r.getClientRects()).filter(b=>b.width&&b.height).at(-1);
+  if(!last)return;
   const tools=$('selectionTools');tools.hidden=false;
   tools.style.left=clipped(last.left,6,innerWidth-tools.offsetWidth-6)+'px';
   tools.style.top=clipped(last.bottom+5,6,innerHeight-tools.offsetHeight-6)+'px';
@@ -555,7 +590,11 @@ function commitQuote(){
   panel('chat');$('selectionTools').hidden=true;getSelection().removeAllRanges();$('question').focus();
 }
 $('useQuote').onclick=commitQuote;
-$('selectionTools').addEventListener('pointerdown',e=>e.preventDefault());
+$('selectionTools').addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault();});
+$('existingThread').onchange=e=>{
+  const f=[...threads].find(t=>t.id===e.target.value);if(!f||draft?.kind!=='answer')return;
+  f.attach(draft);$('selectionTools').hidden=true;getSelection().removeAllRanges();
+};
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#selectionTools'))$('selectionTools').hidden=true;});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('selectionTools').hidden=true;});
 function scheduleAnchors(){if(!anchorFrame)anchorFrame=requestAnimationFrame(()=>{anchorFrame=0;refreshAnchors();});}
@@ -566,30 +605,40 @@ function place(box,x,y){
 function refreshAnchors(){
   const view=$('reading').getBoundingClientRect();
   $('floatLayer').style.setProperty('--available-height',Math.max(1,innerHeight-view.top-8)+'px');
+  const answerMarks=[];
   for(const f of threads){
     place(f.box,f.box.offsetLeft,f.box.offsetTop);
-    let anchor=null;
+    const range=f.quote.kind==='answer'?answerRange(f.quote):null;
+    let anchor=visibleAnswerPoint(range);
+    if(range)answerMarks.push(range);
     for(const piece of f.marks){
       const target=rows[piece.n-1]?.sheet;if(!target)continue;
       if(piece.mark.parentNode!==target)target.append(piece.mark);
       const r=piece.mark.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
       if(!anchor&&x>=view.left&&x<=view.right&&y>=view.top&&y<=view.bottom)anchor={x,y};
     }
-    f.line.style.display=anchor?'':'none';f.jump.textContent=anchor?'定位引文':'引文在视野外 · 定位';
+    f.line.style.display=anchor?'':'none';f.jump.textContent=f.quote.kind==='answer'?'定位来源回答':anchor?'定位引文':'引文在视野外 · 定位';
     if(anchor){
       const b=f.box.getBoundingClientRect(),x=clipped(anchor.x,b.left,b.right),y=clipped(anchor.y,b.top,b.bottom);
       for(const [key,v] of Object.entries({x1:anchor.x,y1:anchor.y,x2:x,y2:y}))f.line.setAttribute(key,v);
     }
   }
+  if(window.Highlight && CSS.highlights){
+    if(answerMarks.length)CSS.highlights.set('answer-origin',new Highlight(...answerMarks));
+    else CSS.highlights.delete('answer-origin');
+  }
 }
-function closeThread(f){threads.delete(f);f.resize.disconnect();f.box.remove();f.line.remove();for(const p of f.marks)p.mark.remove();}
+function closeThread(f){threads.delete(f);scheduleAnchors();f.resize.disconnect();f.box.remove();f.line.remove();for(const p of f.marks)p.mark.remove();}
 function resetStudy(){job=null;draft=null;clearHover();$('selectionTools').hidden=true;for(const f of [...threads])closeThread(f);}
 $('reading').addEventListener('scroll',()=>{$('selectionTools').hidden=true;scheduleAnchors();},{passive:true});
+for(const area of [$('messages'),$('floatLayer')])area.addEventListener('scroll',()=>{
+  $('selectionTools').hidden=true;scheduleAnchors();
+},{capture:true,passive:true});
 window.addEventListener('resize',scheduleAnchors);
 function openThread(quote,id=crypto.randomUUID(),turns=[]){
   if(!quote)return;
   $('selectionTools').hidden=true;getSelection().removeAllRanges();
-  const box=el('section','float-chat'),head=el('div','float-head'),title=el('strong','','临时提问 · 第 '+quote.from+' 页');
+  const box=el('section','float-chat'),head=el('div','float-head'),title=el('strong','','临时提问 · '+quoteLabel(quote));
   box.setAttribute('role','dialog');box.setAttribute('aria-label',title.textContent);
   const expand=el('button','expand-float','展开阅读'), controls=el('div','float-actions');
   expand.setAttribute('aria-pressed','false');
@@ -597,18 +646,48 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
   const excerpt=el('blockquote','',quote.text),jump=el('button','jump','定位引文'),log=el('div','float-log');log.setAttribute('aria-live','polite');
   const form=el('form','float-form'),input=el('textarea'),send=el('button','primary','发送');
   input.placeholder='围绕这段话追问…';input.setAttribute('aria-label','临时问题');input.rows=2;input.maxLength=6000;
-  form.append(input,send);controls.append(expand,close);head.append(title,controls);box.append(head,excerpt,jump,log,form);$('floatLayer').append(box);
+  form.append(input,send);controls.append(expand,close);head.append(title,controls);const extra=el('div','extra-quote');extra.hidden=true;
+  box.append(head,excerpt,jump,log,extra,form);$('floatLayer').append(box);
   
   const sizeHint=el('span','size-hint','拖动右下角调整大小');box.append(sizeHint);
   const line=document.createElementNS('http://www.w3.org/2000/svg','line');$('leaders').append(line);
-  const marks=quote.boxes.map(p=>{const mark=el('i','quote-mark');Object.assign(mark.style,{left:p.x*100+'%',top:p.y*100+'%',width:p.w*100+'%',height:p.h*100+'%'});return {mark,n:p.n};});
-  const f={id,box,line,marks,jump,previous:recentMessages(turns),resize:new ResizeObserver(scheduleAnchors)};threads.add(f);f.resize.observe(box);
-  const first=quote.boxes[0],ref=rows[first.n-1].sheet.getBoundingClientRect();
-  const ax=ref.left+first.x*ref.width,ay=ref.top+first.y*ref.height;
+  const marks=(quote.boxes||[]).map(p=>{const mark=el('i','quote-mark');Object.assign(mark.style,{left:p.x*100+'%',top:p.y*100+'%',width:p.w*100+'%',height:p.h*100+'%'});return {mark,n:p.n};});
+  const f={id,box,quote,line,marks,jump,previous:recentMessages(turns),resize:new ResizeObserver(scheduleAnchors)};threads.add(f);f.resize.observe(box);
+  f.attach=value=>{
+    f.replyQuote=value;extra.replaceChildren();extra.hidden=!value;
+    if(value){
+      const cancel=el('button','remove-quote','取消引用');cancel.onclick=()=>f.attach(null);
+      extra.append(el('span','','AI 回答 · '+value.text),cancel);
+      if(box.nextSibling)$('floatLayer').append(box);
+    }
+    input.focus({preventScroll:true});
+  };
+  const first=quote.boxes?.[0],ref=first&&rows[first.n-1].sheet.getBoundingClientRect();
+  const point=quote.kind==='answer'&&visibleAnswerPoint(answerRange(quote));
+  const ax=first?ref.left+first.x*ref.width:point?point.x:innerWidth*.5;
+  const ay=first?ref.top+first.y*ref.height:point?point.y:innerHeight*.25;
   place(box,ax+box.offsetWidth+42<innerWidth?ax+42:ax-box.offsetWidth-24,ay+25);
-  jump.onclick=()=>{const reader=$('reading'),sheet=rows[first.n-1].sheet.getBoundingClientRect(),view=reader.getBoundingClientRect();
+  jump.onclick=()=>{
+    if(quote.kind==='answer'){
+      const turn=paperTurns.find(t=>t.id===quote.turnId);
+      if(!turn){notice('这条来源回答尚未载入。');return;}
+      if(turn.thread==='main')panel('chat');
+      else{
+        const parent=[...threads].find(t=>t.id===turn.thread);
+        if(parent)$('floatLayer').append(parent.box);
+        else openThread(turn.quote,turn.thread,paperTurns.filter(t=>t.thread===turn.thread));
+      }
+      const range=answerRange(quote);
+      if(range){
+        const node=range.startContainer,body=(node.nodeType===1?node:node.parentElement).closest('[data-answer-id]');
+        const log=body.closest('#messages,.float-log'),rect=range.getBoundingClientRect();
+        log.scrollTop+=rect.top-log.getBoundingClientRect().top-log.clientHeight*.3;
+      }
+      scheduleAnchors();return;
+    }
+    const reader=$('reading'),sheet=rows[first.n-1].sheet.getBoundingClientRect(),view=reader.getBoundingClientRect();
     reader.scrollTop+=sheet.top+first.y*sheet.height-view.top-view.height*.35;reader.scrollLeft+=sheet.left+first.x*sheet.width-view.left-view.width*.35;};
-  box.addEventListener('pointerdown',()=>{if(box.nextSibling)$('floatLayer').append(box);});
+  box.addEventListener('pointerdown',e=>{if(box.nextSibling&&!e.target.closest('[data-answer-id]'))$('floatLayer').append(box);});
   close.onclick=()=>closeThread(f);
   let priorBounds=null;
   expand.onclick=()=>{
@@ -633,18 +712,23 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
     e.preventDefault();const q=input.value.trim();if(!q||send.disabled)return;
     await keyLoad;
     if(!hasKey(provider)){settings();return;}
-    send.disabled=true;input.value='';addMessage('user',q,'你',log);
+    const cited=f.replyQuote;
+    send.disabled=true;input.value='';const user=addMessage('user',q,'你',log);
+    if(cited){user.prepend(quoteBlock(cited));f.attach(null);}
     const turn=newTurn(id,q,'你',materialScope('selection',quote.from,quote),quote);
+    if(cited)turn.replyQuote=cited;
     const label=modelFor(provider),pending=addMessage('assistant','正在阅读引文…',label,log);
     try{
       await storeTurn(turn);
-      const result=await chatRequest(q,await context('selection',quote.from,quote,rows),f.previous);
+      let material=await context('selection',quote.from,quote,rows);
+      if(cited)material+='\n\n'+await context('selection',null,cited,rows);
+      const result=await chatRequest(q,material,f.previous);
       turn.answer=result.answer;await storeTurn(turn);
       if(!threads.has(f))return;
-      pending.remove();const msg=addMessage('assistant',result.answer,label,log);
+      pending.remove();const msg=addMessage('assistant',result.answer,label,log,turn.id);
       saveNoteButton(msg,materialScope('selection',quote.from,quote),q,result.answer);
-      f.previous.push({role:'user',content:q},{role:'assistant',content:result.answer.slice(0,12000)});
-    }catch(err){turn.error=err.message;await storeTurn(turn);if(threads.has(f)){pending.remove();addMessage('assistant',err.message,'发送失败',log);input.value=q;}}
+      f.previous.push({role:'user',content:(quotePrefix(cited)+q).slice(0,12000)},{role:'assistant',content:result.answer.slice(0,12000)});
+    }catch(err){turn.error=err.message;await storeTurn(turn);if(threads.has(f)){pending.remove();addMessage('assistant',err.message,'发送失败',log);input.value=q;if(cited&&!f.replyQuote)f.attach(cited);}}
     finally{send.disabled=false;}
   };
   refreshAnchors();input.focus();
