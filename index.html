@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>研读 · 论文阅读器</title><link rel="icon" href="./icons/book-open.svg"><link rel="stylesheet" href="./reader.css"><link rel="stylesheet" href="./study.css"><link rel="stylesheet" href="./katex/katex.min.css"><script type="module" src="./reader.js"></script></head>
+<body>
+<header><button class="brand" id="shelf" title="我的书架"><img src="icons/book-open.svg" alt="">书架</button><div class="paper-label" id="title">研读</div>
+<div class="tools">
+<button data-icon="list-tree" id="outline" title="论文目录">目录</button><button data-icon="search" id="find" title="查找原文"></button>
+<i></i><button data-icon="minus" id="minus" title="缩小"></button><button id="scale" title="恢复适应宽度">100%</button><button data-icon="plus" id="plus" title="放大"></button>
+<i></i><label class="page-control"><input id="page" aria-label="当前页码" type="number" min="1" value="1"> / <span id="pages">…</span></label>
+<i></i><button data-icon="languages" id="translate" title="从当前页开始逐页翻译整篇论文，使用当前模型的 API 额度">一键翻译全文</button><button id="translationView" hidden title="显示或收起双语对照">收起译文</button>
+</div>
+<button data-icon="upload" id="upload" title="打开本机 PDF">打开 PDF</button><input type="file" id="file" accept=".pdf,application/pdf" hidden>
+<button data-icon="settings-2" id="settings" title="设置模型、讲解风格与个人偏好">AI 设置</button></header>
+<main>
+<div id="reading"><section id="emptyShelf" hidden><img src="icons/book-open.svg" alt=""><h1>从一篇论文开始</h1><p>打开本机 PDF 加入书架。下次用同一浏览器打开这个链接，会接着上次的页码阅读。</p><button class="primary" id="firstOpen">选择 PDF</button><small>文档、译文、笔记和对话记录保存在此浏览器。</small></section><div id="sheets" aria-label="论文原文"></div><div id="notice" role="status" hidden></div></div>
+<aside id="side"><div class="side-head"><span id="sideTitle">与 AI 一起读</span><button id="conversations" title="本篇论文的全部问答">历史</button><button data-icon="panel-right-close" id="collapse" title="收起右栏"></button></div>
+<section id="chat">
+<div id="messages" aria-live="polite"><div id="welcome"><div class="ai-mark"><img src="icons/sparkles.svg" alt=""></div><h1>和这篇论文聊聊</h1><p>围绕全文提问，或在原文中划选一段细读。</p>
+<div class="prompts"><button data-icon="file-text" data-ask="这篇论文想解决什么问题？主要贡献是什么？请引用原文页码。">概括论文贡献</button><button data-icon="scan-line" data-ask="梳理本文方法的输入、关键步骤和输出，并标出总览图的位置。">梳理方法流程</button><button data-icon="list-checks" data-ask="论文如何验证方法有效？挑出关键实验，解释指标与结论，并注明页码。">读懂实验结果</button></div></div></div>
+<form id="composer"><div id="quote" hidden></div><textarea id="question" rows="2" placeholder="询问这篇论文…" aria-label="向论文提问" maxlength="6000"></textarea><div class="compose-bottom"><select id="scope" aria-label="发送给模型的论文范围"><option value="all">整篇论文</option><option value="page">当前页</option><option value="selection" disabled>选区</option></select><button id="send" data-icon="arrow-up" type="submit" title="发送问题"></button></div></form>
+<div class="status"><span id="keyStatus"></span><span id="contextHint"></span></div>
+</section>
+<section id="notesPane" hidden><label for="notes">本篇笔记</label><textarea id="notes" placeholder="写下阅读笔记…"></textarea><small id="noteStatus">更改自动保存在此浏览器。</small></section>
+</aside>
+<nav class="rail" aria-label="右侧阅读工具"><button id="toggle" data-icon="panel-right-open" title="展开或收起右栏"></button><i></i><button id="ai" data-icon="sparkles" title="与 AI 一起读" class="active"></button><button id="quiz" data-icon="list-checks" title="根据当前页出题"></button><button id="explain" data-icon="text-select" title="解释所选段落"></button><button id="fig" data-icon="image" title="根据本页图注解释插图"></button><button id="note" data-icon="notebook-pen" title="论文笔记"></button></nav>
+</main>
+<div id="selectionTools" role="toolbar" aria-label="使用选中文字" hidden><button id="useQuote">引用到右栏</button><button id="newThread">临时提问</button></div>
+<svg id="leaders" aria-hidden="true"></svg><div id="floatLayer"></div>
+<dialog id="settingDialog"><form method="dialog" class="dialog-head"><h2>AI 阅读设置</h2><button data-icon="x" title="关闭设置"></button></form><form id="setup"><label>模型服务<select id="configProvider"><option value="deepseek">DeepSeek 官方</option><option value="openai">OpenAI 官方 · GPT</option></select></label><label>模型名称<input id="model" required maxlength="100" pattern="[A-Za-z0-9._:\-]+"></label><label>讲解风格<select id="style"><option value="easier">Easier Paper · 循序精读</option><option value="direct">简明答疑</option><option value="review">审稿式质询</option></select></label><label>讲解深度<select id="depth"><option value="learn">学习 · 直觉与必要公式</option><option value="deep">深入 · 推导与证据</option></select></label><label>个人阅读偏好<textarea id="preferences" maxlength="1000" rows="3" placeholder="例如：我刚开始学 SLAM，请从传感器输入讲起。"></textarea></label><label>API Key<input type="password" id="key" autocomplete="off" maxlength="1024"></label><p id="keyHelp"></p><p>对话风格用于右栏和临时小窗。提问时会向所选服务发送所选范围的论文文字、问题和最近对话。API 按服务商规则计费。</p><p class="error" id="configError" role="alert"></p><button class="primary">应用设置</button></form></dialog>
+<dialog id="browserDialog"><form method="dialog" class="dialog-head"><h2 id="browserTitle">论文目录</h2><button data-icon="x" title="关闭"></button></form><input id="search" placeholder="在论文中查找…" aria-label="全文查找" hidden><div id="results"></div></dialog>
+</body></html>
