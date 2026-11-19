@@ -15,7 +15,7 @@ function openLibrary(){
   });
   return connection;
 }
-async function transaction(stores,mode,operation){
+export async function transaction(stores,mode,operation){
   const db=await openLibrary();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(stores,mode);
