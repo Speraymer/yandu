@@ -91,11 +91,14 @@ textarea::placeholder,input::placeholder { color:var(--muted); }
 
 html,body { overflow:hidden; overscroll-behavior:none; }
 #reading,#messages,.float-log { overscroll-behavior:none; }
+:root { --question-bg:#c9e2d3; }
+:root[data-theme="dark"] { --question-bg:#344e44; }
 .msg { position:relative; margin-bottom:22px; }
-.msg.user { margin-left:9%; padding:9px 12px; background:var(--tint); border-inline-end:3px solid var(--primary); border-radius:9px; }
+.msg.user { margin-left:9%; padding:9px 12px; background:var(--question-bg); border-inline-end:3px solid var(--primary); border-radius:9px; }
 .msg.user .msg-body { padding:0; border-radius:0; }
-.msg .msg-role { position:sticky; top:0; z-index:1; display:flex; align-items:baseline; gap:8px; padding:5px 0; background:var(--panel); color:var(--ink); font-size:13px; font-weight:750; }
-.msg.user .msg-role { background:var(--tint); color:var(--purple); }
+.msg .msg-role { display:flex; align-items:baseline; gap:8px; padding:5px 0; background:var(--panel); color:var(--ink); font-size:13px; font-weight:750; }
+.msg.user .msg-body,.msg.user .msg-role { background:transparent; }
+.msg.user .msg-role { color:var(--purple); }
 .msg-detail { color:var(--muted); font-size:11px; font-weight:normal; }
 .msg.assistant .msg-role { border-bottom:1px solid var(--line); margin-bottom:8px; }
 .msg-body { min-width:0; }
@@ -106,3 +109,11 @@ html,body { overflow:hidden; overscroll-behavior:none; }
 .answer-table table { width:100%; border-collapse:collapse; font-size:13px; line-height:1.55; }
 .answer-table :is(th,td) { min-width:5em; text-align:start; vertical-align:top; padding:6px 8px; border:1px solid var(--line); white-space:normal; overflow-wrap:break-word; }
 .answer-table th { background:var(--tint); }
+
+.conversation-index h3 { margin:12px 0 4px; color:var(--muted); font-size:13px; }
+.index-excerpt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.conversation-index ol { padding-inline-start:2.5em; margin:0 0 16px; }
+.conversation-index li { padding-block:2px; border-bottom:1px solid var(--line); }
+.conversation-index li::marker { color:var(--muted); font-variant-numeric:tabular-nums; }
+#results .index-question { display:block; }
+.index-question span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; line-height:1.5; }
