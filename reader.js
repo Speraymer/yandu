@@ -2,7 +2,8 @@ import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
 import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js';
 import {formatAnswer} from './answer.js';
-import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn} from './library.js';
+import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
+import {makeReadingPack,readReadingPack} from './reading-pack.js';
 import {contents} from './contents.js';
 import {classifyLayout,translatedBlocks} from './translation-layout.js';
 import {getDocument, GlobalWorkerOptions, TextLayer} from './pdfjs/pdf.min.mjs';
@@ -20,7 +21,7 @@ document.querySelectorAll('[data-icon]').forEach(button => {
   button.prepend(img);
   if (!button.textContent.trim()) button.setAttribute('aria-label', button.title);
 });
-let doc, rows = [], pageNo = 1, zoom = 1, selected = null, busy = false;
+let doc, currentFile, rows = [], pageNo = 1, zoom = 1, selected = null, busy = false;
 let paperId='',paperTurns=[],tocPromise=null;
 let history = [], versions = 0, observer, loadSerial = 0;
 let translationOpen = false, drawingWidth = 0, flashTimer;
@@ -109,10 +110,13 @@ $('page').onchange = () => go(Math.round(Number($('page').value)));
 $('page').onkeydown = e => {if(e.key === 'Enter') $('page').blur()};
 $('reading').addEventListener('scroll', () => {
   if(!rows.length)return;
-  const top=$('reading').getBoundingClientRect().top+Math.min(110,$('reading').clientHeight*.2);
+  const top=readingMarker();
   const next=rows.findIndex(entry=>entry.row.getBoundingClientRect().bottom>top);
   const visiblePage=next<0?rows.length:next+1;
-  if(paperId)localSet('reader.page.'+paperId,String(visiblePage));
+  if(paperId){
+    localSet('reader.page.'+paperId,String(visiblePage));
+    localSet('reader.position.'+paperId,visiblePage+' '+pagePosition(visiblePage));
+  }
   pageNo=visiblePage;
   if(document.activeElement!==$('page')) $('page').value=pageNo;
   status();
@@ -170,12 +174,15 @@ async function pageText(entry) {
   return text.items.filter(i=>typeof i.str==='string').map(i=>i.str+(i.hasEOL?'\n':' ')).join('').trim();
 }
 const welcome=$('welcome');
-async function openPDF(file,name,knownId) {
+async function openPDF(file,name,knownId,progress) {
+  let next;
   const serial=++loadSerial;
   try {
     const bytes=await file.arrayBuffer();
     const id=knownId || Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
-    const next=await getDocument({data:bytes,cMapUrl:asset('./pdfjs/cmaps/'),cMapPacked:true,standardFontDataUrl:asset('./pdfjs/standard_fonts/'),wasmUrl:asset('./pdfjs/wasm/'),iccUrl:asset('./pdfjs/iccs/'),isEvalSupported:false}).promise;
+    if(progress && id!==progress.id)throw Error('PDF 校验失败，请重新传输完整的阅读包。');
+    next=await getDocument({data:bytes,cMapUrl:asset('./pdfjs/cmaps/'),cMapPacked:true,standardFontDataUrl:asset('./pdfjs/standard_fonts/'),wasmUrl:asset('./pdfjs/wasm/'),iccUrl:asset('./pdfjs/iccs/'),isEvalSupported:false}).promise;
+    if(progress && next.numPages!==progress.pages)throw Error('阅读记录与 PDF 页数不符。');
     const pages=[];
     for(let n=1;n<=next.numPages;n++){
       const pdf=await next.getPage(n); const vp=pdf.getViewport({scale:1});
@@ -185,12 +192,15 @@ async function openPDF(file,name,knownId) {
     }
     let saved=[],turns=[];
     try{
-      await rememberBook({id,name,pages:pages.length,accessed:Date.now()},file);
+      const book={id,name,pages:pages.length,accessed:Date.now()};
+      if(progress)await mergeBook(book,file,progress.translations,progress.turns);
+      else await rememberBook(book,file);
       [saved,turns]=await Promise.all([loadSaved('pages',id),loadSaved('turns',id)]);
-    }catch{notice('本机书架存储不可用，请检查浏览器存储空间和权限。');}
-    if(serial!==loadSerial){await next.loadingTask.destroy();return;}
+    }catch(err){if(progress)throw err;notice('本机书架存储不可用，请检查浏览器存储空间和权限。');}
+    if(serial!==loadSerial){if(progress)throw Error('已切换论文，请重新导入。');await next.loadingTask.destroy();return;}
+    if(progress)applyReadingProgress(progress,next.fingerprints[0]);
     observer?.disconnect(); const previous=doc; versions++; rows.forEach(e=>{e.visible=false;e.task?.cancel();e.layerTask?.cancel()});
-    resetStudy(); doc=next;paperId=id;paperTurns=turns.sort((a,b)=>a.time-b.time);tocPromise=null;
+    resetStudy(); doc=next;currentFile=file;paperId=id;paperTurns=turns.sort((a,b)=>a.time-b.time);tocPromise=null;
     setPaperControls(true);
     localSet('reader.lastPaper',id);
     rows=pages; history=[]; selected=null;translationOpen=false;
@@ -209,8 +219,17 @@ async function openPDF(file,name,knownId) {
     },{root:$('reading'),rootMargin:'500px 0px'});
     rows.forEach(e=>observer.observe(e.row));restoreTranslations(saved);
     if(localGet('reader.bilingual.'+id)==='true'&&rows.some(e=>e.zh?.length))viewTranslations(true);
+    const [positionPage,fraction]=(localGet('reader.position.'+id)||'').split(' ').map(Number);
+    if(resumePage===positionPage && Number.isFinite(fraction) && fraction>=0 && fraction<=1){
+      const rect=rows[resumePage-1]?.row.getBoundingClientRect();
+      if(rect)$('reading').scrollTop+=rect.top+rect.height*fraction-readingMarker();
+    }
     restoreChat();status();await previous?.loadingTask.destroy();
-  }catch(err){if(serial===loadSerial)notice('无法打开这份 PDF：'+err.message);}
+  }catch(err){
+    if(next && next!==doc)await next.loadingTask.destroy();
+    if(progress)throw err;
+    if(serial===loadSerial)notice('无法打开这份 PDF：'+err.message);
+  }
 }
 $('upload').onclick=()=>$('file').click();
 $('file').onchange=async()=>{const f=$('file').files[0];if(f)await openPDF(f,f.name);$('file').value='';};
@@ -364,6 +383,7 @@ $('fig').onclick=()=>pageAsk('根据本页的图注与正文解释图中各部�
 $('explain').onclick=()=>{if(busy)return;if(!draft&&!selected){notice('请先在论文原文中划选需要解释的文字。');return;}attachQuote(draft||selected);$('selectionTools').hidden=true;panel('chat');ask('结合所选原文，用中文解释这段话中的术语与推理。','selection');};
 function resultButton(label,n){const b=el('button');b.append(el('span','',label),el('small','',String(n)));b.onclick=()=>{$('browserDialog').close();go(n)};return b;}
 function listDialog(title){
+  $('shelfTransfer').hidden=true;
   findVersion++;$('browserTitle').textContent=title;$('search').hidden=true;$('results').replaceChildren();
   if(!$('browserDialog').open)$('browserDialog').showModal();
   return findVersion;
@@ -380,8 +400,65 @@ $('outline').onclick=async()=>{
     }
   }catch{tocPromise=null;if(token===findVersion)$('results').textContent='目录读取失败，请重新打开目录。';}
 };
+const packHelp='阅读包包含 PDF、阅读位置、译文、笔记和问答。API 密钥仅保存在各自设备。';
+function readingMarker(){
+  const reader=$('reading');
+  return reader.getBoundingClientRect().top+Math.min(110,reader.clientHeight*.2);
+}
+function pagePosition(page){
+  const rect=rows[page-1].row.getBoundingClientRect();
+  return Math.max(0,Math.min(1,(readingMarker()-rect.top)/rect.height));
+}
+function applyReadingProgress(data,fingerprint){
+  const key='reader.notes.'+fingerprint,old=localGet(key)||'';
+  const incoming=data.notes;
+  let notes=old;
+  if(!old || incoming.includes(old))notes=incoming;
+  else if(incoming && !old.includes(incoming))notes=old+'\n\n导入的笔记\n'+incoming;
+  if(!localSet(key,notes)||!localSet('reader.page.'+data.id,String(data.page))||
+      !localSet('reader.position.'+data.id,data.page+' '+data.position)||
+      !localSet('reader.bilingual.'+data.id,String(data.bilingual)))
+    throw Error('当前浏览器无法保存阅读位置或笔记，请检查站点存储空间后重新导入。');
+}
+function transferBusy(active){
+  $('exportPack').disabled=active||!doc;$('importPack').disabled=active;
+}
+$('exportPack').onclick=async()=>{
+  if(!doc)return;
+  transferBusy(true);$('packStatus').textContent='正在生成阅读包…';
+  try{
+    const name=$('title').textContent;
+    const pack=await makeReadingPack({
+      id:paperId,name,pages:rows.length,page:pageNo,
+      position:pagePosition(pageNo),
+      bilingual:translationOpen,notes:$('notes').value,turns:paperTurns,
+      translations:rows.filter(e=>e.done||e.zh?.length).map(e=>({
+        paper:paperId,page:e.n,zh:e.zh||[],done:!!e.done,layoutHints:e.layoutHints||[]
+      }))
+    },currentFile);
+    const link=el('a'),url=URL.createObjectURL(pack);
+    link.href=url;link.download=(name.replace(/\.pdf$/i,'').replace(/[<>:"/\\|?*]/g,'_')||'论文')+'.yandu';
+    document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    $('packStatus').textContent='阅读包已生成。在另一台设备的书架中选择「导入阅读包」即可继续。';
+  }catch(err){$('packStatus').textContent='导出失败：'+err.message;}
+  finally{transferBusy(false);}
+};
+$('importPack').onclick=()=>$('packFile').click();
+$('packFile').onchange=async()=>{
+  const file=$('packFile').files[0];$('packFile').value='';
+  if(!file)return;
+  transferBusy(true);$('packStatus').textContent='正在校验阅读包…';
+  try{
+    const {data,pdf}=await readReadingPack(file);
+    await openPDF(pdf,data.name,undefined,data);
+    $('browserDialog').close();notice('已导入《'+data.name+'》，从第 '+data.page+' 页继续阅读。');
+  }catch(err){$('packStatus').textContent='导入失败：'+err.message;}
+  finally{transferBusy(false);}
+};
 $('shelf').onclick=async()=>{
   const token=listDialog('我的书架');
+  $('shelfTransfer').hidden=false;$('exportPack').disabled=!doc||$('importPack').disabled;
+  if(!$('importPack').disabled)$('packStatus').textContent=packHelp;
   try{
     const books=await shelf();if(token!==findVersion)return;
     $('results').append(el('small','list-source','当前浏览器 · '+books.length+' 篇'));
@@ -413,7 +490,7 @@ $('conversations').onclick=()=>{
   }
 };
 let findVersion=0;
-$('find').onclick=()=>{if(!doc)return;findVersion++;$('browserTitle').textContent='查找原文';$('search').hidden=false;$('search').value='';$('results').replaceChildren();$('browserDialog').showModal();$('search').focus();};
+$('find').onclick=()=>{if(!doc)return;listDialog('查找原文');$('search').hidden=false;$('search').value='';$('search').focus();};
 $('search').oninput=async()=>{
   const serial=++findVersion,q=$('search').value.trim().toLowerCase();$('results').replaceChildren();if(!q)return;
   for(const e of rows){const t=(await pageText(e)).replace(/\s+/g,' ');if(serial!==findVersion)return;const at=t.toLowerCase().indexOf(q);

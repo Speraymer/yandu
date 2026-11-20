@@ -45,3 +45,19 @@ export function savePage(record){
   });
 }
 
+// Each record is compared and written within one transaction, including on retry.
+export function mergeBook(book,blob,pages,turns){
+  return transaction(['books','files','pages','turns'],'readwrite',tx=>{
+    function upsert(store,key,value,accept,externalKey){
+      const table=tx.objectStore(store),read=table.get(key);
+      read.onsuccess=()=>{if(read.result===undefined||accept?.(read.result))externalKey?table.put(value,key):table.put(value);};
+    }
+    upsert('books',book.id,book);
+    upsert('files',book.id,blob,null,true);
+    for(const page of pages)upsert('pages',[book.id,page.page],page,old=>!old.done&&(page.done||page.zh.length>old.zh.length));
+    for(const turn of turns)upsert('turns',turn.id,turn,old=>{
+      if(old.paper!==book.id){tx.abort();return false;}
+      return !old.answer&&!!turn.answer;
+    });
+  });
+}

@@ -1,4 +1,4 @@
-import {shelf,loadSaved,loadFile,transaction} from './library.js';
+import {shelf,loadSaved,loadFile,mergeBook} from './library.js?v=5';
 import {configureKey,hasKey,restoreKeys} from './model-api.js?v=2';
 
 const origin='http://127.0.0.1:18769';
@@ -9,19 +9,6 @@ const status=document.getElementById('status');
 const allowed=/^reader\.(lastPaper|provider|preferences|style|depth|model\.(deepseek|openai)|page\.[a-f\d]{64}|bilingual\.[a-f\d]{64}|notes\.[\w-]+|align\.3\.[\w.-]+)$/;
 const post=(type,data={})=>owner.postMessage({type,nonce,...data},origin);
 
-// Each record is compared and written within one transaction, including on retry.
-function merge(book,blob,pages,turns){
-  return transaction(['books','files','pages','turns'],'readwrite',tx=>{
-    function upsert(store,key,value,accept,externalKey){
-      const table=tx.objectStore(store),read=table.get(key);
-      read.onsuccess=()=>{if(read.result===undefined||accept?.(read.result))externalKey?table.put(value,key):table.put(value);};
-    }
-    upsert('books',book.id,book);
-    upsert('files',book.id,blob,null,true);
-    for(const page of pages)upsert('pages',[book.id,page.page],page,old=>!old.done&&(page.done||page.zh.length>old.zh.length));
-    for(const turn of turns)upsert('turns',turn.id,turn,old=>!old.answer&&!!turn.answer);
-  });
-}
 function preferences(entries){
   for(const [key,incoming] of entries){
     if(!allowed.test(key)||typeof incoming!=='string')continue;
@@ -49,7 +36,7 @@ if(owner&&/^[a-f0-9]{32}$/.test(nonce)){
       for(const {book,blob,translations,history} of papers){
         if(!/^[a-f0-9]{64}$/.test(book.id)||!(blob instanceof Blob)||!blob.size||
           !translations.every(p=>p.paper===book.id&&Array.isArray(p.zh))||!history.every(t=>t.paper===book.id))throw Error('本机书架记录不完整。');
-        await merge(book,blob,translations,history);
+        await mergeBook(book,blob,translations,history);
         const [file,saved,chat]=await Promise.all([loadFile(book.id),loadSaved('pages',book.id),loadSaved('turns',book.id)]);
         if(file?.size!==blob.size||saved.length<translations.length||chat.length<history.length)throw Error('网页书架写入核对未通过。');
         pages+=translations.length;turns+=history.length;
