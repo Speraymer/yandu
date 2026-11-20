@@ -1,22 +1,79 @@
 import katex from './katex/katex.mjs';
 
-// Operate only on text nodes. Page citations are independent, already-linked buttons.
-export function formatAnswer(body){
-  const pattern=/(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|(?<![\\$])\$(?![\s$])[^$\n]+?(?<!\s)\$(?!\$)|\*\*[^\n]+?\*\*)/g;
-  for(const node of Array.from(body.childNodes)){
-    if(node.nodeType!==Node.TEXT_NODE)continue;
-    const out=document.createDocumentFragment();
-    for(const token of node.textContent.split(pattern)){
-      if(token.startsWith('**')&&token.endsWith('**')&&token.length>4){
-        const bold=document.createElement('strong');bold.textContent=token.slice(2,-2);out.append(bold);
-      }else if(/^(?:\$\$|\\\[|\\\(|\$)/.test(token)&&/(\$\$|\\\]|\\\)|\$)$/.test(token)&&token.length>2){
-        const display=token.startsWith('$$')||token.startsWith('\\[');
-        const cut=display||token.startsWith('\\(')?2:1;
-        const math=document.createElement('span');
-        try{katex.render(token.slice(cut,-cut),math,{displayMode:display,throwOnError:true,trust:false,maxExpand:400,maxSize:12,strict:'ignore'});out.append(math);}
-        catch{out.append(token);}
-      }else out.append(token);
-    }
-    node.replaceWith(out);
+function mathNode(tex, displayMode, fallback){
+  const span=document.createElement('span');
+  try{
+    katex.render(tex,span,{displayMode,throwOnError:true,trust:false,maxExpand:400,maxSize:12,strict:'ignore'});
+    return span;
+  }catch{return document.createTextNode(fallback);}
+}
+
+// Protect complete formulas and code before interpreting Markdown punctuation inside a row.
+export function formatMessage(body,source,citation){
+  const atoms=[];
+  function hold(node){
+    atoms.push(node);
+    return '\0'+(atoms.length-1)+'\0';
   }
+  const tokens=/\x00|```[\s\S]*?```|`[^`\n]+`|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|(?<![\\$])\$(?![\s$])[^$\n]+?(?<!\s)\$(?!\$)/g;
+  const text=source.replace(tokens,token=>{
+    if(token==='\0')return hold(document.createTextNode(token));
+    if(token.startsWith('`')){
+      const block=token.startsWith('```');
+      const content=block?token.slice(3,-3).replace(/^\w*\r?\n/,''):token.slice(1,-1);
+      if(!block && /^[A-Za-z\\][\w\\^{}(),+\-\s]*$/.test(content) && /(?:[_^]\\[A-Za-z]+|^\\[A-Za-z]+(?:[_^]|$))/.test(content))
+        return hold(mathNode(content,false,content));
+      const code=document.createElement(block?'pre':'code');code.textContent=content;
+      return hold(code);
+    }
+    const display=token.startsWith('$$')||token.startsWith('\\[');
+    const cut=display||token.startsWith('\\(')?2:1;
+    return hold(mathNode(token.slice(cut,-cut),display,token));
+  });
+  function inline(parent,text,allowBold=true){
+    const pattern=/\0(\d+)\0|\[第\s*(\d+)\s*页\]|\*\*([\s\S]+?)\*\*/g;
+    let end=0;
+    for(const match of text.matchAll(pattern)){
+      parent.append(text.slice(end,match.index));
+      if(match[1]!==undefined)parent.append(atoms[Number(match[1])]);
+      else if(match[2])parent.append(citation(Number(match[2]),match[0])||match[0]);
+      else if(allowBold){
+        const bold=document.createElement('strong');inline(bold,match[3],false);parent.append(bold);
+      }else parent.append(match[0]);
+      end=match.index+match[0].length;
+    }
+    parent.append(text.slice(end));
+  }
+  function cells(line){
+    return line.trim().replace(/^\||\|$/g,'').split(/(?<!\\)\|/).map(s=>s.trim().replace(/\\\|/g,'|'));
+  }
+  const lines=text.split(/\r?\n/);
+  let plain=[];
+  function flush(){
+    if(plain.length)inline(body,plain.join('\n'));
+    plain=[];
+  }
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i], divider=lines[i+1];
+    if(line.includes('|') && divider?.includes('|') && cells(divider).every(s=>/^:?-{3,}:?$/.test(s)) && cells(line).length===cells(divider).length){
+      flush();
+      const wrap=document.createElement('section');wrap.className='answer-table';
+      const table=document.createElement('table');wrap.append(table);body.append(wrap);
+      const header=table.createTHead().insertRow();
+      for(const title of cells(line)){
+        const th=document.createElement('th');th.scope='col';inline(th,title);header.append(th);
+      }
+      const rows=table.createTBody();
+      i++;
+      while(i+1<lines.length && lines[i+1].includes('|') && cells(lines[i+1]).length===header.cells.length){
+        const row=rows.insertRow();
+        for(const value of cells(lines[++i]))inline(row.insertCell(),value);
+      }
+    }else if(/^#{1,6}\s/.test(line)){
+      flush();const heading=document.createElement('h3');inline(heading,line.replace(/^#{1,6}\s+/,''));body.append(heading);
+    }else if(/^---+\s*$/.test(line)){
+      flush();body.append(document.createElement('hr'));
+    }else plain.push(line);
+  }
+  flush();
 }

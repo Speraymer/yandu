@@ -1,7 +1,7 @@
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
 import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
-import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js';
-import {formatAnswer} from './answer.js';
+import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
+import {formatMessage} from './answer.js?v=6';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
 import {makeReadingPack,readReadingPack} from './reading-pack.js';
 import {contents} from './contents.js';
@@ -283,13 +283,17 @@ async function context(scope,n,selection,documentRows) {
   return parts.join('\n\n');
 }
 function addMessage(role, value, label, target=$('messages'),answerId=null) {
-  if(target===$('messages')) welcome.remove(); const msg=el('article','msg '+role);msg.append(el('small','',label));const body=el('div');msg.append(body);
-  for(const part of value.split(/(\[第\s*\d+\s*页\])/g)){
-    const match=/^\[第\s*(\d+)\s*页\]$/.exec(part);
-    if(match && +match[1]<=rows.length && +match[1]>0){const b=el('button','cite',part);b.onclick=()=>go(+match[1]);body.append(b);}
-    else body.append(document.createTextNode(part));
-  }
-  if(role==='assistant')formatAnswer(body);
+  if(target===$('messages'))welcome.remove();
+  const msg=el('article','msg '+role);
+  const author=role==='user'?'我的提问':'AI 回复';
+  const detail=role==='user'?(label||'').replace(/^你(?: · )?/,''):label;
+  const heading=el('small','msg-role',author);
+  if(detail)heading.append(el('span','msg-detail',detail));
+  const body=el('div','msg-body');msg.append(heading,body);
+  formatMessage(body,value,(page,text)=>{
+    if(page<1||page>rows.length)return null;
+    const button=el('button','cite',text);button.onclick=()=>go(page);return button;
+  });
   if(answerId)body.dataset.answerId=answerId;
   target.append(msg);
   if(role==='assistant'){
@@ -311,8 +315,8 @@ async function storeTurn(turn){
 function replayTurn(turn,target,legacyFirst=false){
   const user=addMessage('user',turn.question,turn.label,target);
   const citation=turn.replyQuote||(turn.thread==='main'?turn.quote:null);
-  if(citation)user.prepend(quoteBlock(citation));
-  if(turn.quote && (turn.firstQuote ?? legacyFirst))user.prepend(quoteBlock(turn.quote));
+  if(citation)user.querySelector(".msg-body").before(quoteBlock(citation));
+  if(turn.quote && (turn.firstQuote ?? legacyFirst))user.querySelector(".msg-body").before(quoteBlock(turn.quote));
   const reply=addMessage('assistant',turn.answer||turn.error||'未收到完整答复，可重新提问。',turn.model,target,turn.answer?turn.id:null);
   if(turn.answer)saveNoteButton(reply,turn.source,turn.question,turn.answer);
 }
@@ -349,7 +353,7 @@ async function ask(question,scope=$('scope').value,n=pageNo) {
     await storeTurn(turn);if(ref!==doc)return;
     panel('chat');const userMsg=addMessage('user',question,label);
     if(quote){
-      userMsg.prepend(quoteBlock(quote));
+      userMsg.querySelector(".msg-body").before(quoteBlock(quote));
       if(selected===quote && $('scope').value==='selection'){clearComposerQuote();consumed=true;}
     }
     if(field.value.trim()===question)field.value='';
@@ -816,8 +820,8 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
     if(!hasKey(provider)){settings();return;}
     const cited=f.replyQuote,firstQuote=!excerpt.hidden;
     send.disabled=true;input.value='';const user=addMessage('user',q,'你',log);
-    if(cited){user.prepend(quoteBlock(cited));f.attach(null);}
-    if(firstQuote){user.prepend(quoteBlock(quote));excerpt.hidden=true;}
+    if(cited){user.querySelector(".msg-body").before(quoteBlock(cited));f.attach(null);}
+    if(firstQuote){user.querySelector(".msg-body").before(quoteBlock(quote));excerpt.hidden=true;}
     const turn=newTurn(id,q,'你',materialScope('selection',quote.from,quote),quote);
     turn.firstQuote=firstQuote;
     if(cited)turn.replyQuote=cited;

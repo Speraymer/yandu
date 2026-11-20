@@ -14,7 +14,7 @@ export function selectedAnswer(range, text) {
   if (!body || !body.contains(range.endContainer) || !text) return null;
   return {
     kind: 'answer', turnId: body.dataset.answerId, text,
-    start: boundary(body, range.startContainer, range.startOffset),
+    layout: 2, start: boundary(body, range.startContainer, range.startOffset),
     end: boundary(body, range.endContainer, range.endOffset),
   };
 }
@@ -24,13 +24,33 @@ export function answerRange(quote) {
   if (!body) return null;
   const resolve = point => point.path.reduce((node, index) => node?.childNodes[index], body);
   const start = resolve(quote.start), end = resolve(quote.end);
-  if (!start || !end) return null;
+  if (start && end) {
+    const range = document.createRange();
+    try {
+      range.setStart(start, quote.start.offset);
+      range.setEnd(end, quote.end.offset);
+      if (quote.layout === 2 || range.toString().trim() === quote.text) return range;
+    } catch { /* Older messages can have a different DOM after formatting. */ }
+  }
+  // Only restore a legacy text anchor if the excerpt uniquely identifies its location.
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let text = '';
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!node.length || node.parentElement.closest('.katex-mathml')) continue;
+    nodes.push({node, offset:text.length});
+    text += node.data;
+  }
+  const at = text.indexOf(quote.text);
+  if (at < 0 || !quote.text || text.indexOf(quote.text, at + 1) >= 0) return null;
+  const last = at + quote.text.length;
+  const firstNode = nodes.find(p => p.offset + p.node.length > at);
+  const lastNode = nodes.find(p => p.offset + p.node.length >= last);
   const range = document.createRange();
-  try {
-    range.setStart(start, quote.start.offset);
-    range.setEnd(end, quote.end.offset);
-    return range;
-  } catch { return null; }
+  range.setStart(firstNode.node, at - firstNode.offset);
+  range.setEnd(lastNode.node, last - lastNode.offset);
+  return range;
 }
 
 export function visibleAnswerPoint(range) {
