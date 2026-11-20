@@ -117,3 +117,12 @@ html,body { overflow:hidden; overscroll-behavior:none; }
 .conversation-index li::marker { color:var(--muted); font-variant-numeric:tabular-nums; }
 #results .index-question { display:block; }
 .index-question span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; line-height:1.5; }
+
+#side { position:relative; flex:none; min-width:0; width:clamp(230px,var(--side-width,clamp(308px,27.5vw,430px)),calc(100% - 260px)); }
+#paneDivider { position:absolute; z-index:2; inset:0 auto 0 -5px; width:10px; display:grid; place-items:center; cursor:col-resize; touch-action:none; user-select:none; }
+#paneDivider::after { content:""; width:4px; height:40px; border-radius:4px; background:var(--accent-line); }
+#paneDivider:is(:hover,:focus-visible,:active)::after { background:var(--primary); }
+@media(max-width:740px) {
+  #side { position:absolute; width:clamp(min(220px,65vw),var(--side-width,350px),calc(100% - 50px)); }
+  #paneDivider { left:-8px; width:16px; }
+}
