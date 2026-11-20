@@ -220,11 +220,7 @@ function showScope(){
   if(visible){
     const top=el('div','quote-heading'), remove=el('button','remove-quote','取消引用');
     remove.type='button';
-    remove.onclick=()=>{
-      if(draft===selected)draft=null;
-      selected=null;$('scope').options[2].disabled=true;$('scope').value=scopeBeforeQuote;
-      $('quote').replaceChildren();showScope();$('question').focus({preventScroll:true});
-    };
+    remove.onclick=()=>{clearComposerQuote();$('question').focus({preventScroll:true});};
     top.append(el('div','quote-preview',quoteLabel(selected)+' · '+selected.text),remove);
     $('quote').replaceChildren(top);
     const actions=el('div','quote-actions');
@@ -293,18 +289,21 @@ async function storeTurn(turn){
   }
   try{await saveTurn(turn);}catch{notice('问答记录保存失败，请检查本机存储空间。');}
 }
-function replayTurn(turn,target){
+function replayTurn(turn,target,legacyFirst=false){
   const user=addMessage('user',turn.question,turn.label,target);
   const citation=turn.replyQuote||(turn.thread==='main'?turn.quote:null);
   if(citation)user.prepend(quoteBlock(citation));
+  if(turn.quote && (turn.firstQuote ?? legacyFirst))user.prepend(quoteBlock(turn.quote));
   const reply=addMessage('assistant',turn.answer||turn.error||'未收到完整答复，可重新提问。',turn.model,target,turn.answer?turn.id:null);
   if(turn.answer)saveNoteButton(reply,turn.source,turn.question,turn.answer);
 }
 function recentMessages(turns){
-  return turns.filter(t=>t.answer).slice(-4).flatMap(t=>[
-    {role:'user',content:(quotePrefix(t.replyQuote||(t.thread==='main'?t.quote:null))+t.question).slice(0,12000)},
-    {role:'assistant',content:t.answer.slice(0,12000)}
-  ]);
+  const answered=turns.filter(t=>t.answer);
+  return answered.slice(-4).flatMap(turn=>{
+    const usedAnchor=turn.thread==='main'||(turn.firstQuote ?? (turn===answered[0]));
+    const question=quotePrefix(usedAnchor?turn.quote:null)+quotePrefix(turn.replyQuote)+turn.question;
+    return [{role:'user',content:question.slice(0,12000)},{role:'assistant',content:turn.answer.slice(0,12000)}];
+  });
 }
 function restoreChat(){
   const main=paperTurns.filter(t=>t.thread==='main');
@@ -317,26 +316,43 @@ async function chatRequest(q, material, previous){
 async function ask(question,scope=$('scope').value,n=pageNo) {
   if(busy||!doc||!question.trim())return;
   await keyLoad;
+  if(busy)return;
   if(!hasKey(provider)){$('question').value=question;settings();return;}
-  const ref=doc, model=modelFor(provider), quote=selected;
-  setBusy(true);let pending,turn;
+  const field=$('question'),ref=doc,model=modelFor(provider);
+  const quote=$('scope').value==='selection'?selected:null;
+  const returnScope=scopeBeforeQuote;
+  setBusy(true);let pending,turn,consumed=false;
   try {
     const material=await context(scope,n,quote,rows);
     if(doc!==ref)return;
     const label=scope==='all'?'你 · 全文':scope==='selection'?'你 · 选区':'你 · 第 '+n+' 页';
-    turn=newTurn('main',question,label,materialScope(scope,n,quote),scope==='selection'?quote:null);
+    turn=newTurn('main',question,label,materialScope(scope,n,quote),quote);
     await storeTurn(turn);if(ref!==doc)return;
     panel('chat');const userMsg=addMessage('user',question,label);
-    if(scope==='selection' && quote)userMsg.prepend(quoteBlock(quote));
-    $('question').value='';pending=addMessage('assistant','正在阅读原文…',model);
+    if(quote){
+      userMsg.prepend(quoteBlock(quote));
+      if(selected===quote && $('scope').value==='selection'){clearComposerQuote();consumed=true;}
+    }
+    if(field.value.trim()===question)field.value='';
+    pending=addMessage('assistant','正在阅读原文…',model);
     const result=await chatRequest(question,material,history);
     turn.answer=result.answer;await storeTurn(turn);
     if(doc!==ref)return;
     pending.remove();const reply=addMessage('assistant',result.answer,model,$('messages'),turn.id);
     saveNoteButton(reply,materialScope(scope,n,quote),question,result.answer);
-    history.push({role:'user',content:(scope==='selection'?quotePrefix(quote):'')+question},{role:'assistant',content:result.answer});
+    history.push({role:'user',content:quotePrefix(quote)+question},{role:'assistant',content:result.answer});
     history=history.slice(-8).map(m=>({...m,content:m.content.slice(0,12000)}));
-  }catch(err){if(turn&&!turn.answer){turn.error=err.message;await storeTurn(turn);}pending?.remove();if(doc===ref){panel('chat');addMessage('assistant',err.message,'发送失败');$('question').value=question;}}
+  }catch(err){
+    if(turn&&!turn.answer){turn.error=err.message;await storeTurn(turn);}
+    pending?.remove();
+    if(doc===ref){
+      panel('chat');addMessage('assistant',err.message,'发送失败');
+      if(!field.value && (!selected || selected===quote)){
+        field.value=question;
+        if(consumed && !selected && $('scope').value===returnScope)attachQuote(quote);
+      }
+    }
+  }
   finally{setBusy(false);}
 }
 $('composer').onsubmit=e=>{e.preventDefault();ask($('question').value.trim())};
@@ -581,6 +597,13 @@ function selectionText(node,range){
   return sub.toString();
 }
 let scopeBeforeQuote='all';
+function clearComposerQuote(){
+  if(draft===selected)draft=null;
+  selected=null;
+  if($('scope').value==='selection')$('scope').value=scopeBeforeQuote;
+  $('scope').options[2].disabled=true;
+  $('quote').replaceChildren();showScope();
+}
 function attachQuote(quote){
   if($('scope').value!=='selection')scopeBeforeQuote=$('scope').value;
   selected=quote;$('scope').options[2].disabled=false;$('scope').value='selection';showScope();
@@ -647,6 +670,7 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
   const form=el('form','float-form'),input=el('textarea'),send=el('button','primary','发送');
   input.placeholder='围绕这段话追问…';input.setAttribute('aria-label','临时问题');input.rows=2;input.maxLength=6000;
   form.append(input,send);controls.append(expand,close);head.append(title,controls);const extra=el('div','extra-quote');extra.hidden=true;
+  excerpt.hidden=turns.some(t=>t.answer);
   box.append(head,excerpt,jump,log,extra,form);$('floatLayer').append(box);
   
   const sizeHint=el('span','size-hint','拖动右下角调整大小');box.append(sizeHint);
@@ -702,7 +726,7 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
     expand.textContent=priorBounds?'还原大小':'展开阅读';expand.setAttribute('aria-pressed',String(!!priorBounds));
     refreshAnchors();
   };
-  for(const turn of turns)replayTurn(turn,log);
+  for(const turn of turns)replayTurn(turn,log,turn===turns[0]);
   let drag;
   head.onpointerdown=e=>{if(e.target.closest('button'))return;drag={x:e.clientX-box.offsetLeft,y:e.clientY-box.offsetTop};head.setPointerCapture(e.pointerId);e.preventDefault();};
   head.onpointermove=e=>{if(drag){place(box,e.clientX-drag.x,e.clientY-drag.y);refreshAnchors();}};
@@ -711,24 +735,36 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
   form.onsubmit=async e=>{
     e.preventDefault();const q=input.value.trim();if(!q||send.disabled)return;
     await keyLoad;
+    if(send.disabled)return;
     if(!hasKey(provider)){settings();return;}
-    const cited=f.replyQuote;
+    const cited=f.replyQuote,firstQuote=!excerpt.hidden;
     send.disabled=true;input.value='';const user=addMessage('user',q,'你',log);
     if(cited){user.prepend(quoteBlock(cited));f.attach(null);}
+    if(firstQuote){user.prepend(quoteBlock(quote));excerpt.hidden=true;}
     const turn=newTurn(id,q,'你',materialScope('selection',quote.from,quote),quote);
+    turn.firstQuote=firstQuote;
     if(cited)turn.replyQuote=cited;
     const label=modelFor(provider),pending=addMessage('assistant','正在阅读引文…',label,log);
     try{
       await storeTurn(turn);
-      let material=await context('selection',quote.from,quote,rows);
-      if(cited)material+='\n\n'+await context('selection',null,cited,rows);
+      const excerpts=[];
+      if(firstQuote)excerpts.push(await context('selection',quote.from,quote,rows));
+      if(cited)excerpts.push(await context('selection',null,cited,rows));
+      const material=excerpts.join('\n\n')||'请结合这段临时会话的已有对话回答后续问题。';
       const result=await chatRequest(q,material,f.previous);
       turn.answer=result.answer;await storeTurn(turn);
       if(!threads.has(f))return;
       pending.remove();const msg=addMessage('assistant',result.answer,label,log,turn.id);
       saveNoteButton(msg,materialScope('selection',quote.from,quote),q,result.answer);
-      f.previous.push({role:'user',content:(quotePrefix(cited)+q).slice(0,12000)},{role:'assistant',content:result.answer.slice(0,12000)});
-    }catch(err){turn.error=err.message;await storeTurn(turn);if(threads.has(f)){pending.remove();addMessage('assistant',err.message,'发送失败',log);input.value=q;if(cited&&!f.replyQuote)f.attach(cited);}}
+      f.previous.push({role:'user',content:(quotePrefix(firstQuote?quote:null)+quotePrefix(cited)+q).slice(0,12000)},{role:'assistant',content:result.answer.slice(0,12000)});
+    }catch(err){
+      turn.error=err.message;await storeTurn(turn);
+      if(threads.has(f)){
+        pending.remove();addMessage('assistant',err.message,'发送失败',log);
+        if(firstQuote)excerpt.hidden=false;
+        if(!input.value&&!f.replyQuote){input.value=q;if(cited)f.attach(cited);}
+      }
+    }
     finally{send.disabled=false;}
   };
   refreshAnchors();input.focus();
