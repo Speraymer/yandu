@@ -5,6 +5,8 @@
 @media(max-width:740px){.tools{overflow-x:auto;justify-content:flex-start;min-width:0;scrollbar-width:thin}.tools>*{flex:none}.paper-label{max-width:16vw}#settings,#upload{font-size:12px}.float-chat{max-height:58dvh}}
 
 #quote .quote-preview{overflow:hidden;text-overflow:ellipsis}.quote-actions{display:flex;gap:7px;margin-top:3px}.quote-actions button{font-size:11px;padding:3px 5px;color:#5f4273;text-decoration:underline}
+/* Keep absolutely positioned math accessibility text inside its scroll pane. */
+#messages,.float-log{position:relative}
 .msg .katex-display{overflow-x:auto;overflow-y:hidden;padding:4px 0}.msg .katex{white-space:normal}.quote-actions{flex-wrap:wrap}.quote-actions button{white-space:nowrap}@media(max-width:740px){.row:has(.translation:not([hidden])){flex-direction:column}.row .translation:not([hidden]){width:100%!important;height:230px!important;border-top:1px solid var(--line)}}
 .quote-heading{display:flex;align-items:center;gap:6px}.quote-heading .quote-preview{flex:1;min-width:0}.remove-quote{flex:none;background:#fff;border:1px solid var(--line);color:#675078;padding:3px 7px;font-size:12px}
 .float-chat{width: min(440px,calc(100vw - 10px));height:min(450px,62dvh);min-width:min(285px,calc(100vw - 10px));min-height:min(245px,var(--available-height,70dvh));max-width:calc(100vw - 8px);max-height:var(--available-height,80dvh);resize:both}
