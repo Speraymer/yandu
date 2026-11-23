@@ -1,11 +1,11 @@
-import {bindModelChoices} from './model-choices.js';
+import {bindModelChoices} from './model-choices.js?v=2';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js?v=2';
 import './pane-divider.js';
 import {recallTurns} from './course-context.js?v=4';
 import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
-import {selectedProvider, defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=5';
+import {selectedProvider, defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=6';
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
 import {formatMessage} from './answer.js?v=6';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
@@ -123,7 +123,7 @@ function configFields() {
   const p = $('configProvider').value; $('model').value = modelFor(p); $('key').value = '';
   $('rememberKey').checked = remembersKey(p);
   $('forgetKey').hidden = !hasKey(p);
-  $('keyHelp').textContent = remembersKey(p) ? '此服务的密钥已保存在当前浏览器，重新打开可继续使用。' : hasKey(p) ? '此服务的密钥仅在当前标签页有效。' : '填入所选服务商的个人 API Key。';
+  $('keyHelp').textContent = remembersKey(p) ? '此服务的密钥已保存在当前浏览器，重新打开可继续使用。' : hasKey(p) ? '此标签页的论文与课程共用此密钥。' : '填入所选服务商的个人 API Key。';
   $('key').required = false; $('configError').textContent = '';
 }
 async function settings() { await keyLoad; $('configProvider').value = provider; configFields(); $('style').value=styleChoice(); $('depth').value=localGet('reader.depth')||'learn'; $('preferences').value=localGet('reader.preferences')||''; $('settingDialog').showModal(); }

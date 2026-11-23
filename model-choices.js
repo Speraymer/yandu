@@ -1,4 +1,4 @@
-import {tongjiModels} from './model-api.js?v=5';
+import {tongjiModels} from './model-api.js?v=6';
 
 export function bindModelChoices(provider) {
   const byId = id => document.getElementById(id);

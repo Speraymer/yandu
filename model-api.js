@@ -21,7 +21,12 @@ function validateKey(provider, key) {
   }
 }
 
+const sessionKey = provider => new URL('.',import.meta.url).pathname+':model-session:'+provider;
 export function restoreKeys() {
+  for (const provider of Object.keys(services)) {
+    const value = globalThis.sessionStorage?.getItem(sessionKey(provider));
+    if (value) { validateKey(provider,value); keys.set(provider,value); }
+  }
   return loadKeys((provider,value) => {
     validateKey(provider,value);
     keys.set(provider,value);
@@ -41,12 +46,15 @@ export async function configureKey(provider, input, remember = false) {
     await removeKey(provider);
     remembered.delete(provider);
   }
+  if (remember) globalThis.sessionStorage?.removeItem(sessionKey(provider));
+  else globalThis.sessionStorage?.setItem(sessionKey(provider),value);
   keys.set(provider,value);
 }
 
 export async function forgetKey(provider) {
   await removeKey(provider);
   remembered.delete(provider);
+  globalThis.sessionStorage?.removeItem(sessionKey(provider));
   keys.delete(provider);
 }
 

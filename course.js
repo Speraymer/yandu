@@ -1,4 +1,4 @@
-import {bindModelChoices} from './model-choices.js';
+import {bindModelChoices} from './model-choices.js?v=2';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips} from './note-clips.js?v=3';
 import {slideTextLayer} from './slide-text.js';
@@ -9,7 +9,7 @@ import {exportCoursePack,importCoursePack} from './course-pack.js';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
-import {selectedProvider, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=5';
+import {selectedProvider, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=6';
 
 const $ = id => document.getElementById(id);
 function node(tag, text, cls) {
@@ -360,7 +360,7 @@ function fields() {
   $('model').value = modelFor(p); $('key').value = ''; $('remember').checked = remembersKey(p);
   $('forgetKey').hidden = !hasKey(p); $('visionOption').hidden = p === 'deepseek';
   $('vision').checked = visionEnabled(p);
-  $('keyHelp').textContent = remembersKey(p) ? '密钥已保存在此浏览器。' : hasKey(p) ? '密钥仅在当前页面有效。' : '请输入个人 API Key。';
+  $('keyHelp').textContent = remembersKey(p) ? '密钥已保存在此浏览器。' : hasKey(p) ? '此标签页的论文与课程共用此密钥。' : '请输入个人 API Key。';
   $('configError').textContent = '';
 }
 async function settings() {
