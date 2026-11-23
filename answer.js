@@ -9,7 +9,7 @@ function mathNode(tex, displayMode, fallback){
 }
 
 // Protect complete formulas and code before interpreting Markdown punctuation inside a row.
-export function formatMessage(body,source,citation){
+export function formatMessage(body,source,citation,{paragraphs=false}={}){
   const atoms=[];
   function hold(node){
     atoms.push(node);
@@ -50,9 +50,24 @@ export function formatMessage(body,source,citation){
   const lines=text.split(/\r?\n/);
   let plain=[];
   function flush(){
-    if(plain.length)inline(body,plain.join('\n'));
+    if(plain.length){
+      const content=plain.join('\n');
+      if(paragraphs){
+        const parts=content.length>180 ? content.split(/(?<=[。！？])(?=[^”’」』）])/u) : [content];
+        let chunk='';
+        for(const part of parts){
+          if(chunk.length>=100){paragraph(chunk);chunk='';}
+          chunk+=part;
+        }
+        if(chunk)paragraph(chunk);
+      }else inline(body,content);
+    }
     plain=[];
   }
+  function paragraph(content){
+    const p=document.createElement('p');inline(p,content);body.append(p);
+  }
+  const marker=/^\s*(?:[-*+]\s+|(\d+)(?:[.)]\s+|、\s*))(\S.*)$/;
   for(let i=0;i<lines.length;i++){
     const line=lines[i], divider=lines[i+1];
     if(line.includes('|') && divider?.includes('|') && cells(divider).every(s=>/^:?-{3,}:?$/.test(s)) && cells(line).length===cells(divider).length){
@@ -69,6 +84,21 @@ export function formatMessage(body,source,citation){
         const row=rows.insertRow();
         for(const value of cells(lines[++i]))inline(row.insertCell(),value);
       }
+    }else if(paragraphs && !line.trim()){
+      flush();
+    }else if(paragraphs && marker.test(line)){
+      flush();
+      let match=marker.exec(line);
+      const numbered=match[1]!==undefined;
+      const list=document.createElement(numbered?'ol':'ul');
+      if(numbered)list.start=Number(match[1]);
+      for(;;){
+        const li=document.createElement('li');inline(li,match[2]);list.append(li);
+        match=marker.exec(lines[i+1]||'');
+        if(!match || (match[1]!==undefined)!==numbered)break;
+        i++;
+      }
+      body.append(list);
     }else if(/^#{1,6}\s/.test(line)){
       flush();const heading=document.createElement('h3');inline(heading,line.replace(/^#{1,6}\s+/,''));body.append(heading);
     }else if(/^---+\s*$/.test(line)){

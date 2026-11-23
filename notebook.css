@@ -24,3 +24,5 @@ dialog.notebook {
 
 .notebook .notebook-paper [hidden]{display:none!important}
 #notesPreview p{margin:.6em 0} #notesPreview h3{margin:1.3em 0 .4em} #clipDrawer summary{cursor:pointer}
+
+#notesPreview p{white-space:pre-line} #notesPreview ul,#notesPreview ol{margin:.55em 0 1em;padding-inline-start:1.6em} #notesPreview ul{list-style:disc} #notesPreview ol{list-style:decimal} #notesPreview li+li{margin-top:.35em}
