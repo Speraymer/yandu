@@ -58,10 +58,15 @@ export async function forgetKey(provider) {
   keys.delete(provider);
 }
 
-async function tongjiNetworkError(response) {
-  if (response.status !== 403) return;
+async function tongjiError(response,model) {
+  if (![400,403].includes(response.status)) return;
   const data = await response.json().catch(()=>null);
-  if (data?.error?.message?.includes('当前网络环境不支持')) {
+  const message = data?.error?.message;
+  if (typeof message !== 'string') return;
+  if (response.status === 400 && /^Invalid model\b/i.test(message)) {
+    throw Error('同济平台不识别模型「'+model+'」。请在 AI 设置点「读取同济可用模型」，选择列表中的模型后应用设置。');
+  }
+  if (response.status === 403 && message.includes('当前网络环境不支持')) {
     throw Error('同济平台返回 403「当前网络环境不支持」。请切换到校方允许调用 API 的网络后重试。');
   }
 }
@@ -78,7 +83,7 @@ export async function tongjiModels(input) {
     });
   } catch { throw Error('无法连接同济模型服务，请检查网络后重试。'); }
   if (!response.ok) {
-    await tongjiNetworkError(response);
+    await tongjiError(response);
     throw Error('同济平台返回 '+response.status+'，请检查 API Key 和模型访问权限。');
   }
   const {data} = await response.json();
@@ -111,8 +116,8 @@ export async function complete({provider, model, question, context, history = []
     throw Error(error.name === 'TimeoutError' ? '模型响应超时，请稍后再试。' : '浏览器无法连接所选模型服务，请检查网络和服务可用地区。');
   }
   if (!response.ok) {
-    if (provider === 'tongji') await tongjiNetworkError(response);
-    const hints = {400:course ? '请检查模型名称和图片输入支持，或关闭附图后再提问。' : '请检查模型名称或缩小论文范围。',401:'API Key 无效，请在 AI 设置中重新填写。',402:'模型账户余额不足。',403:'账户或所在地区无权使用该模型。',404:'请检查模型名称。',429:'请检查账户额度或稍后再试。'};
+    if (provider === 'tongji') await tongjiError(response,model);
+    const hints = {400:course && image ? '请检查模型名称和图片输入支持，或关闭附图后再提问。' : '请检查模型名称或缩小提问范围。',401:'API Key 无效，请在 AI 设置中重新填写。',402:'模型账户余额不足。',403:'账户或所在地区无权使用该模型。',404:'请检查模型名称。',429:'请检查账户额度或稍后再试。'};
     throw Error('模型服务返回 ' + response.status + '。' + (hints[response.status] || '请稍后再试。'));
   }
   const result = await response.json();
