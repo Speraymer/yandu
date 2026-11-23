@@ -1,10 +1,11 @@
+import {bindModelChoices} from './model-choices.js';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js?v=2';
 import './pane-divider.js';
 import {recallTurns} from './course-context.js?v=4';
 import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
-import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
+import {selectedProvider, defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=5';
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
 import {formatMessage} from './answer.js?v=6';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
@@ -30,12 +31,11 @@ let doc, currentFile, rows = [], pageNo = 1, zoom = 1, selected = null, busy = f
 let paperId='',paperTurns=[],tocPromise=null;
 let versions = 0, observer, loadSerial = 0;
 let translationOpen = false, drawingWidth = 0, flashTimer;
-const defaultModels = {deepseek:'deepseek-flash',openai:'gpt-4.1-mini'};
 function notice(message) {
   $('notice').textContent = message; $('notice').hidden = false;
   clearTimeout(flashTimer); flashTimer = setTimeout(() => $('notice').hidden = true, 5500);
 }
-let provider = localGet('reader.provider') === 'openai' ? 'openai' : 'deepseek';
+let provider = selectedProvider(localGet('reader.provider'));
 const styleNames = {easier:'Easier Paper',direct:'简明答疑',review:'审稿式质询'};
 const stylePrompts = {
   easier:'从读者的起点讲。整篇问题先串起研究矛盾、已有方法的局限、输入、方法、输出、实验和结论边界，再按自然单元逐步展开。局部问题聚焦指定句、图或公式与必要前提。首次出现的术语保留英文并解释，可以用一个简短例子，随后精确映射回原文。说明为什么这样设计、每个关键量如何变化，区分论文事实、作者解释、背景知识和学习推断。围绕提问讲到疑问解决为止。只有读者要求比较或理解本题确实需要前置概念时，才简短说明具体联系。',
@@ -47,7 +47,7 @@ function teachingQuestion(q){
   const depth=localGet('reader.depth')==='deep'?'系统说明公式、变量、假设、消融和失效条件。':'优先直觉，只用理解机制所必需的数学。';
   return [stylePrompts[styleChoice()],depth,'需要公式时用 LaTeX，以 $...$ 或 $$...$$ 分隔。','读者偏好：'+(localGet('reader.preferences')||'无'), '当前问题：'+q].join('\n');
 }
-const modelFor = p => localGet('reader.model.' + p) || defaultModels[p];
+const modelFor = p => localGet('reader.model.' + p) || defaultModel(p);
 function turnPage(t){
   if (Number.isInteger(t?.chatPage)) return t.chatPage;
   return Number(/^第 (\d+) 页/.exec(t?.source || '')?.[1]) || t?.quote?.from || 0;
@@ -117,7 +117,9 @@ $('notes').oninput = () => {
   if (doc) $('noteStatus').textContent = localSet('reader.notes.'+doc.fingerprints[0],$('notes').value) ? '已保存在此浏览器。' : '浏览器存储已满，笔记尚未保存。';
 };
 if(matchMedia('(max-width:740px)').matches) panel('closed');
+const refreshModelChoices = bindModelChoices($('configProvider'));
 function configFields() {
+  refreshModelChoices();
   const p = $('configProvider').value; $('model').value = modelFor(p); $('key').value = '';
   $('rememberKey').checked = remembersKey(p);
   $('forgetKey').hidden = !hasKey(p);
