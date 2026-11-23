@@ -1,3 +1,5 @@
+import './pane-divider.js';
+import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
 import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
@@ -26,9 +28,6 @@ let paperId='',paperTurns=[],tocPromise=null;
 let history = [], versions = 0, observer, loadSerial = 0;
 let translationOpen = false, drawingWidth = 0, flashTimer;
 const defaultModels = {deepseek:'deepseek-flash',openai:'gpt-4.1-mini'};
-const storagePrefix = new URL('.', import.meta.url).pathname + ':';
-function localGet(k) {try{return localStorage.getItem(storagePrefix+k)}catch{return null}}
-function localSet(k,v) {try{localStorage.setItem(storagePrefix+k,v);return true}catch{return false}}
 function notice(message) {
   $('notice').textContent = message; $('notice').hidden = false;
   clearTimeout(flashTimer); flashTimer = setTimeout(() => $('notice').hidden = true, 5500);
@@ -53,37 +52,6 @@ function status() {
   $('contextHint').textContent = $('scope').value === 'all' ? '全文 · ' + rows.length + ' 页' : $('scope').value === 'page' ? '原文第 ' + pageNo + ' 页' : selected?.kind==='answer'?'AI 回答选区':'原文选区';
   $('send').disabled = busy || !doc;
 }
-const divider=$('paneDivider'), side=$('side');
-const savedWidth=Number(localGet('reader.sideWidth'));
-if(savedWidth>0 && savedWidth<100)side.style.setProperty('--side-width',savedWidth+'vw');
-
-function setSideWidth(px){
-  side.style.setProperty('--side-width',px/innerWidth*100+'vw');
-  // Store the visible (clamped) width so dragging back from either limit responds immediately.
-  const percent=side.getBoundingClientRect().width/innerWidth*100;
-  side.style.setProperty('--side-width',percent+'vw');
-  return percent;
-}
-let grabOffset=0;
-divider.onpointerdown=e=>{
-  if(!e.isPrimary || e.button!==0)return;
-  e.preventDefault();divider.focus({preventScroll:true});
-  grabOffset=e.clientX-side.getBoundingClientRect().left;
-  divider.setPointerCapture(e.pointerId);
-};
-divider.onpointermove=e=>{
-  if(divider.hasPointerCapture(e.pointerId))setSideWidth(side.getBoundingClientRect().right-e.clientX+grabOffset);
-};
-divider.onlostpointercapture=()=>localSet('reader.sideWidth',String(side.getBoundingClientRect().width/innerWidth*100));
-divider.onkeydown=e=>{
-  if(e.key!=='ArrowLeft' && e.key!=='ArrowRight')return;
-  e.preventDefault();
-  const percent=setSideWidth(side.offsetWidth+(e.key==='ArrowLeft'?16:-16));
-  localSet('reader.sideWidth',String(percent));
-};
-new ResizeObserver(()=>{
-  if(side.offsetWidth)divider.setAttribute('aria-valuenow',String(Math.round(side.offsetWidth/innerWidth*100)));
-}).observe(side);
 function panel(name) {
   $('side').hidden = name === 'closed';
   $('chat').hidden = name !== 'chat'; $('notesPane').hidden = name !== 'notes';

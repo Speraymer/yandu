@@ -11,11 +11,12 @@
     root.dataset.theme = dark ? 'dark' : 'light';
     root.classList.toggle('original-paper', original);
     const theme = document.getElementById('themeToggle'), paper = document.getElementById('paperColors');
-    if (!theme || !paper) return;
+    if (!theme) return;
     theme.setAttribute('aria-pressed', String(dark));
     theme.title = dark ? '切换到白天模式' : '切换到夜间模式';
     theme.querySelector('span').textContent = dark ? '夜间' : '白天';
     theme.querySelector('img').src = dark ? './icons/moon.svg' : './icons/sun.svg';
+    if (!paper) return;
     paper.hidden = !dark;
     paper.setAttribute('aria-pressed', String(original));
     paper.title = original ? '恢复 PDF 夜间配色' : '查看 PDF 原始图表配色';
@@ -28,6 +29,7 @@
       choice = root.dataset.theme === 'dark' ? 'light' : 'dark';
       save('theme', choice); apply();
     };
+    if (!document.getElementById('paperColors')) return;
     document.getElementById('paperColors').onclick = () => {
       original = !original; save('originalPaper', String(original)); apply();
     };

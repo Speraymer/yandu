@@ -1,0 +1,45 @@
+header a,.course-entry {color:var(--muted);text-decoration:none;font-size:13px;white-space:nowrap;padding:6px}
+header a:hover,.course-entry:hover {color:var(--primary);text-decoration:underline}
+.course header {gap:12px}
+.mode {color:var(--primary);font-size:13px;border-bottom:2px solid var(--primary);padding:7px 0}
+.project-picker {margin-right:auto;min-width:0;display:flex;align-items:center;gap:3px}
+.course select,.course input[type=number] {color:var(--ink);background:var(--page);border:1px solid var(--line);border-radius:6px;padding:6px}
+#projects {max-width:24vw}
+.course #reading {display:flex;flex-direction:column;overflow:hidden}
+#deckBar,#pageBar {background:var(--bar);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px clamp(12px,2vw,30px);flex:none}
+#deckBar {border-bottom:1px solid var(--line)}
+#deckBar section {display:grid;gap:4px;min-width:0;max-width:82%}
+#decks {width:100%;font-weight:650}
+#deckMenu {position:relative;font-size:13px}
+#deckMenu summary {cursor:pointer;white-space:nowrap}
+#deckMenu div {position:absolute;right:0;top:26px;padding:6px;background:var(--page);border:1px solid var(--line);z-index:2;width:max-content;border-radius:7px}
+#deckMenu button {display:block}
+#stage {min-height:0;flex:1;display:grid;place-items:center;padding:clamp(12px,2vw,30px);overflow:auto}
+#slide {width:100%;height:100%;min-height:0;object-fit:contain}
+#empty {max-width:380px;text-align:center;line-height:1.7}
+#empty img {width:38px} #empty h1 {font-size:26px} #empty p {color:var(--muted)}
+#pageBar {border-top:1px solid var(--line);justify-content:flex-start;flex-wrap:wrap}
+#pageBar .pager {display:flex;align-items:center;margin-right:auto}
+.pager button {font-size:23px;padding:0 12px}
+.pager input {width:4em;text-align:center}
+.learned {display:flex;align-items:center;gap:5px;cursor:pointer}
+.learned input {accent-color:var(--primary)}
+#activity {padding:8px 15px;background:var(--panel);overflow-wrap:anywhere}
+.course .side-head {background:var(--panel)}
+#scopeHint {display:block;color:var(--primary);overflow-wrap:anywhere;margin-bottom:8px}
+.course #composer {margin-bottom:4px}
+.course .status {min-height:20px}
+.course .msg-role {white-space:normal}
+.course .msg-role button {font-weight:400;color:var(--muted);font-size:11px;padding:0;text-align:left}
+.course .compose-bottom small {font-size:11px}
+.course #welcome {padding-top:32px}
+.import-stage {position:fixed;top:0;left:-100000px;pointer-events:none;color:#000;background:white;color-scheme:light}
+.mobile-only {display:none}
+@media(max-width:740px) {
+ .course header {gap:5px}.project-picker {order:2;width:100%;border-top:1px solid var(--line);padding-top:4px}#projects {max-width:65%;flex:1}
+ .course #side {right:0;width:min(95%,430px);max-width:100%}
+ .mobile-only {display:inline-flex}
+ #openChat {background:var(--primary);color:var(--on-primary);position:absolute;right:12px;top:75px;z-index:1}
+ .course #side:not([hidden]) ~ #openChat {display:none}
+ #pageBar,#deckBar {padding:8px;gap:5px}
+}

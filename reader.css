@@ -3,3 +3,5 @@
 @media(max-width:1000px){.paper-label{max-width:65px}.tools i{margin:0 2px}}
 @media(max-width:740px){header{height:auto;min-height:48px;flex-wrap:wrap;gap:4px;padding:5px 9px}.brand{font-size:15px}.paper-label{max-width:38vw;margin-right:auto}.tools{order:2;width:100%;justify-content:center;border-top:1px solid var(--line);padding-top:4px}.tools button{padding:5px 6px}.rail{width:38px}.rail button{width:32px}#side{position:absolute;right:38px;top:0;bottom:0;width:min(350px,calc(100% - 38px));z-index:3;box-shadow:-4px 0 18px #21182d14}#welcome{padding-top:18px}#sheets{padding:8px}.translation{width:78vw}#translate{font-size:12px}}
 
+
+.course-entry{color:var(--purple);font-size:13px;text-decoration:none;white-space:nowrap}.course-entry:hover{text-decoration:underline}
