@@ -21,3 +21,6 @@ dialog.notebook {
   dialog.notebook{width:100vw;height:100dvh;border:0;border-radius:0}
   .notebook-desk{padding:0}.notebook-paper{padding:28px 20px;min-height:100%}
 }
+
+.notebook .notebook-paper [hidden]{display:none!important}
+#notesPreview p{margin:.6em 0} #notesPreview h3{margin:1.3em 0 .4em} #clipDrawer summary{cursor:pointer}

@@ -1,10 +1,11 @@
+import {bindOrganizer} from './note-organizer.js';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js?v=2';
 import './pane-divider.js';
 import {recallTurns} from './course-context.js?v=4';
 import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
-import {defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=8';
+import {defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=9';
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
 import {formatMessage} from './answer.js?v=6';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
@@ -92,11 +93,14 @@ function panel(name) {
 }
 $('toggle').onclick = () => panel($('side').hidden ? 'chat' : 'closed');
 $('collapse').onclick = () => panel('closed'); $('ai').onclick = () => panel('chat');
+const prepareNotes = bindOrganizer({editor:$('notes'),status:$('noteStatus'),dialog:$('paperNotesDialog'),
+  scope:()=>paperId && 'paper:'+paperId, storage:()=>'reader.notes.'+doc.fingerprints[0], title:()=>$('paperNotesTitle').textContent,
+  service:()=>({provider,model:modelFor(provider)})});
 function showPaperNotes(){
   if (!doc) {notice('请先打开一篇论文。');return;}
   $('paperNotesTitle').textContent=$('title').textContent;
   renderClips($('paperClips'),'paper:'+paperId);
-  $('paperNotesDialog').showModal();
+  prepareNotes(); $('paperNotesDialog').showModal();
 }
 $('note').onclick = showPaperNotes;
 function paperClip(turn,role){
