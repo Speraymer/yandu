@@ -37,7 +37,7 @@ function readingData(data) {
   check(Array.isArray(clips));
   const cleanClips=clips.map(({turn,time,page,role,offset,text:value})=>{
     check(text(turn) && nonnegative(time) && nonnegative(page) && page<=pages &&
-      (role===0 || role===1) && nonnegative(offset) && text(value));
+      ([0,1,2,3].includes(role)) && nonnegative(offset) && text(value));
     return {turn,time,order:0,book:'',page,role,offset,text:value};
   });
   const pageIds = new Set(), turnIds = new Set();

@@ -1,5 +1,5 @@
 import {onFileDrop} from './file-drop.js';
-import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js';
+import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js?v=2';
 import './pane-divider.js';
 import {recallTurns} from './course-context.js?v=4';
 import {localGet,localSet} from './reader-storage.js';
@@ -8,7 +8,7 @@ import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} fr
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
 import {formatMessage} from './answer.js?v=6';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
-import {makeReadingPack,readReadingPack} from './reading-pack.js?v=2';
+import {makeReadingPack,readReadingPack} from './reading-pack.js?v=3';
 import {contents} from './contents.js';
 import {classifyLayout,translatedBlocks} from './translation-layout.js';
 import {getDocument, GlobalWorkerOptions, TextLayer} from './pdfjs/pdf.min.mjs';
@@ -107,7 +107,12 @@ enableClipSelection(article=>{
   const id=article.dataset.questionId || article.querySelector('[data-answer-id]')?.dataset.answerId;
   const turn=paperTurns.find(t=>t.id===id);
   return turn && {scope:'paper:'+paperId,clip:paperClip(turn,Number(article.classList.contains('assistant')))};
-},()=>{ $('selectionTools').hidden=true;notice('已写入论文笔记。'); },notice);
+},()=>{ $('selectionTools').hidden=true;notice('已写入论文笔记。'); },notice,body=>{
+  const row=body.closest('.row');
+  if (!row || !paperId)return;
+  const page=Number(row.firstElementChild.dataset.page);
+  return {scope:'paper:'+paperId,clip:{turn:'source/'+page,time:0,order:0,book:'',page,role:body.classList.contains('translation')?3:2}};
+});
 $('notes').oninput = () => {
   if (doc) $('noteStatus').textContent = localSet('reader.notes.'+doc.fingerprints[0],$('notes').value) ? '已保存在此浏览器。' : '浏览器存储已满，笔记尚未保存。';
 };

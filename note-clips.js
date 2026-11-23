@@ -14,7 +14,7 @@ export function loadClips(scope){
   return sortedClips(clips);
 }
 export function saveClip(scope,clip){
-  const id=JSON.stringify([clip.turn,clip.role,clip.offset,clip.text.length]);
+  const id=JSON.stringify([clip.turn,clip.role,clip.offset,clip.role>=2?clip.text:clip.text.length]);
   localStorage.setItem(scopePrefix(scope)+id,JSON.stringify(clip));
 }
 export function renderClips(target,scope){
@@ -22,25 +22,25 @@ export function renderClips(target,scope){
   if(!scope)return;
   try {
     const clips=loadClips(scope);
-    if(!clips.length){target.textContent='选中提问或回答中的文字，点「写入笔记」即可摘录。';return;}
+    if(!clips.length){target.textContent='选中原文或问答中的文字，点「写入笔记」即可摘录。';return;}
     for(const c of clips){
       const item=document.createElement('section'), heading=document.createElement('small'), text=document.createElement('p');
-      heading.textContent=[c.book,c.page?'第 '+c.page+' 页':'全文',c.role?'回答':'提问'].filter(Boolean).join('　');
+      heading.textContent=[c.book,c.page?'第 '+c.page+' 页':'全文',['提问','回答','原文','译文'][c.role]].filter(Boolean).join('　');
       text.textContent=c.text;item.append(heading,text);target.append(item);
     }
   }catch{target.textContent='无法读取摘录，请检查浏览器存储权限。';}
 }
 
-export function enableClipSelection(resolve,onSaved,report){
+export function enableClipSelection(resolve,onSaved,report,source){
   const button=document.createElement('button');
   button.className='selection-note';button.textContent='写入笔记';button.hidden=true;document.body.append(button);
   let picked;
   function update(){
     const s=getSelection(),range=s?.rangeCount && !s.isCollapsed ? s.getRangeAt(0) : null;
     const start=range && range.startContainer;
-    const body=start && (start.parentElement?.closest('.msg-body') || start.closest?.('.msg-body'));
+    const body=start && (start.nodeType===1?start:start.parentElement)?.closest('.msg-body,.source-excerpt,.textLayer,.translation');
     const article=body?.closest('.msg');
-    const meta=article && body.contains(range.endContainer) && article.getClientRects().length && resolve(article);
+    const meta=body && body.contains(range.endContainer) && body.getClientRects().length && (article?resolve(article):source?.(body));
     const text=meta && s.toString().trim();
     picked=null;button.hidden=true;
     if(!text)return;

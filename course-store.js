@@ -37,7 +37,7 @@ export async function addDeck(project, name, pages) {
     learned:pages.map(() => false)};
   await access(['decks','images'],'readwrite',tx => {
     tx.objectStore('decks').add(deck);
-    pages.forEach(({image},i) => tx.objectStore('images').add(image,[deck.id, i+1]));
+    pages.forEach(({image,layout},i) => tx.objectStore('images').add({image,layout},[deck.id, i+1]));
   });
   return deck;
 }

@@ -1,4 +1,5 @@
-import {getDocument, GlobalWorkerOptions} from './pdfjs/pdf.min.mjs';
+import {captureText} from './slide-text.js';
+import {getDocument, GlobalWorkerOptions, TextLayer} from './pdfjs/pdf.min.mjs';
 
 const asset = path => new URL(path, import.meta.url).href;
 GlobalWorkerOptions.workerSrc = asset('./pdfjs/pdf.worker.min.mjs');
@@ -14,6 +15,7 @@ async function pdfPages(bytes, progress) {
     wasmUrl:asset('./pdfjs/wasm/'), iccUrl:asset('./pdfjs/iccs/')});
   const pdf = await task.promise;
   const pages = [];
+  const stage=document.createElement('div');stage.className='import-stage';stage.inert=true;document.body.append(stage);
   try {
     for (let n = 1; n <= pdf.numPages; n++) {
       progress(n, pdf.numPages);
@@ -26,11 +28,15 @@ async function pdfPages(bytes, progress) {
       await page.render({canvas, viewport}).promise;
       const content = await page.getTextContent();
       const text = content.items.map(item => (item.str || '') + (item.hasEOL ? '\n' : ' ')).join('').trim();
-      pages.push({text, image:await imageBlob(canvas)});
+      stage.style.width=viewport.width+'px';stage.style.height=viewport.height+'px';
+      stage.style.setProperty('--total-scale-factor',viewport.scale);
+      const layer=document.createElement('div');layer.className='textLayer';stage.replaceChildren(layer);
+      await new TextLayer({container:layer,viewport,textContentSource:content}).render();
+      pages.push({text,layout:captureText(stage),image:await imageBlob(canvas)});
       canvas.width = canvas.height = 0;
       page.cleanup();
     }
-  } finally { await task.destroy(); }
+  } finally { stage.remove();await task.destroy(); }
   return pages;
 }
 
@@ -58,7 +64,7 @@ async function pptxPages(bytes, progress) {
         const canvas = await window.htmlToImage.toCanvas(handle.element, {
           skipFonts:true, backgroundColor:'#ffffff', pixelRatio:1800 / Math.max(model.width,model.height)
         });
-        pages.push({text:lines[index].join('\n'), image:await imageBlob(canvas)});
+        pages.push({text:lines[index].join('\n'), layout:captureText(handle.element), image:await imageBlob(canvas)});
         canvas.width = canvas.height = 0;
       } finally { handle.dispose(); }
     }

@@ -36,3 +36,9 @@ test('reject unsupported format, damaged metadata, duplicate or out-of-scope rec
     {translations:[{paper:id,page:5,done:true,zh:[]}]}
   ])await assert.rejects(makeReadingPack({...data,...changes},pdf));
 });
+
+test('paper source and translation excerpts retain their labels in a reading pack',async()=>{
+  const clips=[2,3].map(role=>({turn:'source/2',time:0,order:0,book:'',page:2,role,offset:5,text:'正文摘录'}));
+  const restored=await readReadingPack(await makeReadingPack({...data,clips},pdf));
+  assert.deepEqual(restored.data.clips,clips);
+});

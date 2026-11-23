@@ -1,10 +1,11 @@
 import {onFileDrop} from './file-drop.js';
-import {enableClipSelection,renderClips} from './note-clips.js';
+import {enableClipSelection,renderClips} from './note-clips.js?v=2';
+import {slideTextLayer} from './slide-text.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
-import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js?v=2';
+import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js?v=3';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
-import {readSlides} from './course-import.js';
+import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
 import {restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=4';
 
@@ -71,7 +72,9 @@ function updateDeckOptions() {
     d.learned.filter(Boolean).length + '/' + d.texts.length + ' 页）', d.id)));
   if (deck) $('decks').value = deck.id;
 }
+const drawSource = slideTextLayer($('slideText'));
 function clearImage() {
+  drawSource(null); $('plainSource').hidden=true; $('plainBody').textContent='';
   if (currentImage && (currentImage.deck !== deck || currentImage.page !== page)) {
     const old = currentImage;
     setLearned(old.deck.id,old.page,true,true).then(flags => {
@@ -89,14 +92,18 @@ async function showPage(n) {
   if (!deck) { clearImage(); sync(); return; }
   page = Math.max(1, Math.min(deck.texts.length, Math.floor(Number(n)) || 1));
   clearImage(); $('question').value = drafts.get(chatKey()) || ''; drawChat(); sync();
-  const blob = await slideImage(deck.id, page);
+  const stored = await slideImage(deck.id, page);
   if (token !== view) return;
+  const blob=stored?.image || stored;
   if (!blob) throw Error('本页图像无法读取，请重新导入原课件。');
   const url = URL.createObjectURL(blob);
   currentImage = {url, blob, deck, page};
   $('slide').src = url;
   $('slide').alt = deck.name + '，第 ' + page + ' 页。' + deck.texts[page-1].slice(0,300);
   $('slide').hidden = false;
+  drawSource(stored.layout);
+  $('plainSource').hidden=false;
+  $('plainBody').textContent=deck.texts[page-1] || '本页没有可提取的文字。';
   localSet('course.page.'+deck.id,String(page));
   sync();
 }
@@ -266,7 +273,10 @@ enableClipSelection(article=>{
   const item=turn && decks.find(d=>d.id===turn.deck);
   return item && {scope:'course:'+turn.project,clip:{turn:turn.id,time:turn.time,order:item.time,
     book:item.name,page:turn.page,role:Number(article.classList.contains('assistant'))}};
-},()=>activity('已写入课程笔记。'),activity);
+},()=>activity('已写入课程笔记。'),activity,body=>{
+  if (!currentImage || !body.closest('#reading') || (body.id==='plainBody' && !deck.texts[page-1].trim()))return;
+  return {scope:'course:'+project.id,clip:{turn:'source/'+deck.id+'/'+page,time:0,order:deck.time,book:deck.name,page,role:2}};
+});
 
 const keyLoad = restoreKeys().catch(() => activity('已保存的密钥读取失败，可在 AI 设置中填写。'));
 function fields() {

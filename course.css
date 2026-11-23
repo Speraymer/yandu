@@ -43,3 +43,11 @@ header a:hover,.course-entry:hover {color:var(--primary);text-decoration:underli
  .course #side:not([hidden]) ~ #openChat {display:none}
  #pageBar,#deckBar {padding:8px;gap:5px}
 }
+#slide,#slideText{grid-area:1/1;min-width:0}
+#slideText{align-self:stretch;justify-self:stretch;position:relative;overflow:hidden;pointer-events:none;min-height:0}
+.slide-text-runs{position:absolute;left:50%;top:50%;color:transparent;line-height:1;user-select:text}
+.slide-text-runs span{position:absolute;white-space:pre;font-family:sans-serif;line-height:1;transform-origin:left top;pointer-events:auto;cursor:text}
+.slide-text-runs ::selection{background:#6798df66;color:transparent}
+#plainSource{background:var(--panel);padding:6px 16px;font-size:13px}
+#plainSource summary{cursor:pointer}
+#plainBody{max-height:28vh;overflow:auto;white-space:pre-wrap;padding:8px 0;line-height:1.65;user-select:text}
