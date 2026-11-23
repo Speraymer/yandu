@@ -1,4 +1,5 @@
 import {onFileDrop} from './file-drop.js';
+import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js';
 import './pane-divider.js';
 import {recallTurns} from './course-context.js?v=3';
 import {localGet,localSet} from './reader-storage.js';
@@ -7,7 +8,7 @@ import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} fr
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
 import {formatMessage} from './answer.js?v=6';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
-import {makeReadingPack,readReadingPack} from './reading-pack.js';
+import {makeReadingPack,readReadingPack} from './reading-pack.js?v=2';
 import {contents} from './contents.js';
 import {classifyLayout,translatedBlocks} from './translation-layout.js';
 import {getDocument, GlobalWorkerOptions, TextLayer} from './pdfjs/pdf.min.mjs';
@@ -92,7 +93,18 @@ function panel(name) {
 }
 $('toggle').onclick = () => panel($('side').hidden ? 'chat' : 'closed');
 $('collapse').onclick = () => panel('closed'); $('ai').onclick = () => panel('chat');
-$('note').onclick = () => panel('notes');
+function showPaperNotes(){
+  renderClips($('paperClips'),paperId && 'paper:'+paperId);panel('notes');
+}
+$('note').onclick = showPaperNotes;
+function paperClip(turn,role){
+  return {turn:turn.id,time:turn.time,order:0,book:'',page:turnPage(turn),role};
+}
+enableClipSelection(article=>{
+  const id=article.dataset.questionId || article.querySelector('[data-answer-id]')?.dataset.answerId;
+  const turn=paperTurns.find(t=>t.id===id);
+  return turn && {scope:'paper:'+paperId,clip:paperClip(turn,Number(article.classList.contains('assistant')))};
+},()=>{ $('selectionTools').hidden=true;notice('已写入论文笔记。'); },notice);
 $('notes').oninput = () => {
   if (doc) $('noteStatus').textContent = localSet('reader.notes.'+doc.fingerprints[0],$('notes').value) ? '已保存在此浏览器。' : '浏览器存储已满，笔记尚未保存。';
 };
@@ -240,6 +252,7 @@ async function openPDF(file,name,knownId,progress) {
     const resumePage=Number(localGet('reader.page.'+id))||1;
     updateTranslationAction(); $('translate').classList.remove('active');$('quote').hidden=true;$('scope').value='all';$('scope').options[2].disabled=true;
     $('messages').replaceChildren(welcome);$('question').value='';$('title').textContent=name;$('title').title=name;document.title=name+' · 研读';
+    if (!$('notesPane').hidden) renderClips($('paperClips'),'paper:'+paperId);
     $('notes').value=localGet('reader.notes.'+doc.fingerprints[0])||'';$('noteStatus').textContent='更改自动保存在此浏览器。';
     pageNo=1; zoom=1;drawingWidth=0; $('pages').textContent=rows.length;$('page').max=rows.length;
     $('sheets').replaceChildren(...rows.map(e=>e.row));layout();go(resumePage);
@@ -481,6 +494,7 @@ function pagePosition(page){
 }
 function applyReadingProgress(data,fingerprint){
   const key='reader.notes.'+fingerprint,old=localGet(key)||'';
+  for(const clip of data.clips || [])saveClip('paper:'+data.id,clip);
   const incoming=data.notes;
   let notes=old;
   if(!old || incoming.includes(old))notes=incoming;
@@ -501,7 +515,7 @@ $('exportPack').onclick=async()=>{
     const pack=await makeReadingPack({
       id:paperId,name,pages:rows.length,page:pageNo,
       position:pagePosition(pageNo),
-      bilingual:translationOpen,notes:$('notes').value,turns:paperTurns,
+      bilingual:translationOpen,notes:$('notes').value,clips:loadClips('paper:'+paperId),turns:paperTurns,
       translations:rows.filter(e=>e.done||e.zh?.length).map(e=>({
         paper:paperId,page:e.n,zh:e.zh||[],done:!!e.done,layoutHints:e.layoutHints||[]
       }))
@@ -596,9 +610,12 @@ function saveNoteButton(reply,source,question,answer){
   const b=el('button','clip-note','摘入笔记');
   b.onclick=()=>{
     if(!doc)return;
-    const next=[$('notes').value,source+'\n问：'+question+'\n'+answer].filter(Boolean).join('\n\n');
-    if(!localSet('reader.notes.'+doc.fingerprints[0],next)){notice('笔记存储空间不足。');return;}
-    $('notes').value=next;b.textContent='已摘入笔记';b.disabled=true;
+    const id=reply.querySelector('[data-answer-id]')?.dataset.answerId;
+    const turn=paperTurns.find(t=>t.id===id);
+    if(!turn)return;
+    try{saveClip('paper:'+paperId,{...paperClip(turn,1),offset:0,text:answer});}
+    catch{notice('未能写入论文笔记，请检查浏览器存储空间。');return;}
+    b.textContent='已摘入笔记';b.disabled=true;
   };reply.append(b);
 }
 function cacheKey(e){return 'reader.align.3.'+e.fingerprint+'.'+e.n;}

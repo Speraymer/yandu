@@ -1,4 +1,5 @@
 import {onFileDrop} from './file-drop.js';
+import {enableClipSelection,renderClips} from './note-clips.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
 import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js?v=2';
@@ -39,6 +40,7 @@ const withImage = () => provider === 'openai' && localGet('course.vision') !== '
 
 function sync() {
   const ready = !!(deck && currentImage);
+  $('courseNotes').disabled = !project;
   $('import').disabled = !project || importing;
   $('projects').disabled = importing || !projectList.length;
   $('addProject').disabled = importing;
@@ -228,8 +230,10 @@ function drawChat() {
     const source = node('button','《' + t.name + '》第 ' + t.page + ' 页');
     source.title = '返回提问时的课件页';
     source.onclick = () => { if (matchMedia('(max-width:740px)').matches) $('side').hidden = true; openDeck(t.deck,t.page).catch(problem); };
+    user.dataset.turnId=t.id;
     role.append(source); user.append(role,node('div',t.question,'msg-body')); log.append(user);
     const reply = node('article','','msg assistant'), body = node('div','','msg-body');
+    if(t.answer) reply.dataset.turnId=t.id;
     formatMessage(body,t.answer || t.error || (pending.get(chatKey()) === t.id ? '正在回答…' : '本次提问未收到完整回复。'),() => null);
     reply.append(node('div',t.model,'msg-role'),body); log.append(reply);
     if (t.memory?.length) {
@@ -245,6 +249,17 @@ function drawChat() {
   }
   log.scrollTop = log.scrollHeight;
 }
+
+$('courseNotes').onclick=()=>{
+  renderClips($('courseClips'),'course:'+project.id);
+  $('courseNotesDialog').showModal();
+};
+enableClipSelection(article=>{
+  const turn=turns.find(t=>t.id===article.dataset.turnId && t.project===project?.id);
+  const item=turn && decks.find(d=>d.id===turn.deck);
+  return item && {scope:'course:'+turn.project,clip:{turn:turn.id,time:turn.time,order:item.time,
+    book:item.name,page:turn.page,role:Number(article.classList.contains('assistant'))}};
+},()=>activity('已写入课程笔记。'),activity);
 
 const keyLoad = restoreKeys().catch(() => activity('已保存的密钥读取失败，可在 AI 设置中填写。'));
 function fields() {

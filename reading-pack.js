@@ -33,8 +33,15 @@ function readingData(data) {
   check(text(id) && /^[a-f0-9]{64}$/.test(id) && text(name) && name.trim() && positive(pages));
   check(positive(page) && page <= pages && Number.isFinite(position) && position >= 0 && position <= 1);
   check(typeof bilingual === 'boolean' && text(notes) && Array.isArray(translations) && Array.isArray(turns));
+  const clips = data.clips ?? [];
+  check(Array.isArray(clips));
+  const cleanClips=clips.map(({turn,time,page,role,offset,text:value})=>{
+    check(text(turn) && nonnegative(time) && nonnegative(page) && page<=pages &&
+      (role===0 || role===1) && nonnegative(offset) && text(value));
+    return {turn,time,order:0,book:'',page,role,offset,text:value};
+  });
   const pageIds = new Set(), turnIds = new Set();
-  return {id,name,pages,page,position,bilingual,notes,translations:translations.map(record => {
+  return {id,name,pages,page,position,bilingual,notes,clips:cleanClips,translations:translations.map(record => {
     const {paper,page,zh,done,layoutHints = []} = record;
     check(paper === id && positive(page) && page <= pages && !pageIds.has(page));
     check(Array.isArray(zh) && zh.every(text) && typeof done === 'boolean' && Array.isArray(layoutHints));

@@ -7,3 +7,9 @@
 .course-entry{color:var(--purple);font-size:13px;text-decoration:none;white-space:nowrap}.course-entry:hover{text-decoration:underline}
 
 .file-drop-hint{position:fixed;inset:12px;z-index:999;display:grid;place-items:center;pointer-events:none;border:3px dashed var(--primary);border-radius:12px;background:var(--glass);color:var(--primary);font-size:20px;font-weight:650}
+.selection-note{position:fixed;z-index:100;background:var(--primary);color:var(--on-primary);box-shadow:0 2px 8px #0003}
+.selection-note:hover{background:var(--primary)}
+.note-clips{overflow:auto;max-height:60vh;font-size:14px;line-height:1.65;overflow-wrap:anywhere}
+#paperClips{max-height:45vh}
+.note-clips section{border-bottom:1px solid var(--line);padding:9px 0}
+.note-clips p{margin:3px 0;white-space:pre-wrap}

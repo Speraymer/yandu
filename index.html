@@ -2,7 +2,7 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com; base-uri 'none'; form-action 'none'; object-src 'none'">
-<title>研读 · 论文阅读器</title><link rel="icon" href="./icons/book-open.svg"><link rel="stylesheet" href="./reader.css?v=2"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><script type="module" src="./reader.js?v=11"></script><link rel="stylesheet" href="./theme.css?v=8"><script src="./theme.js"></script></head>
+<title>研读 · 论文阅读器</title><link rel="icon" href="./icons/book-open.svg"><link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><script type="module" src="./reader.js?v=12"></script><link rel="stylesheet" href="./theme.css?v=8"><script src="./theme.js"></script></head>
 <body>
 <header><button class="brand" id="shelf" title="我的书架"><img src="icons/book-open.svg" alt="">书架</button><a class="course-entry" href="./course.html">课程学习</a><div class="paper-label" id="title">研读</div>
 <div class="tools">
@@ -22,7 +22,7 @@
 <form id="composer"><div id="quote" hidden></div><textarea id="question" rows="2" placeholder="询问这篇论文…" aria-label="向论文提问" maxlength="6000"></textarea><div class="compose-bottom"><select id="scope" aria-label="发送给模型的论文范围"><option value="all">整篇论文</option><option value="page">当前页</option><option value="selection" disabled>选区</option></select><button id="send" data-icon="arrow-up" type="submit" title="发送问题"></button></div></form>
 <div class="status"><span id="keyStatus"></span><span id="contextHint"></span></div>
 </section>
-<section id="notesPane" hidden><label for="notes">本篇笔记</label><textarea id="notes" placeholder="写下阅读笔记…"></textarea><small id="noteStatus">更改自动保存在此浏览器。</small></section>
+<section id="notesPane" hidden><strong>对话摘录</strong><section id="paperClips" class="note-clips"></section><label for="notes">自由笔记</label><textarea id="notes" placeholder="写下阅读笔记…"></textarea><small id="noteStatus">更改自动保存在此浏览器。</small></section>
 </aside>
 <nav class="rail" aria-label="右侧阅读工具"><button id="toggle" data-icon="panel-right-open" title="展开或收起右栏"></button><i></i><button id="ai" data-icon="sparkles" title="与 AI 一起读" class="active"></button><button id="quiz" data-icon="list-checks" title="根据当前页出题"></button><button id="explain" data-icon="text-select" title="解释所选段落"></button><button id="fig" data-icon="image" title="根据本页图注解释插图"></button><button id="note" data-icon="notebook-pen" title="论文笔记"></button><div class="theme-tools"><button id="paperColors" hidden aria-label="PDF 原色" aria-pressed="false"><img src="./icons/palette.svg" alt=""><span>原色</span></button><button id="themeToggle" aria-label="夜间模式" aria-pressed="false"><img src="./icons/sun.svg" alt=""><span>白天</span></button></div></nav>
 </main>

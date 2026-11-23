@@ -3,8 +3,8 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>研读 · 课程学习</title><link rel="icon" href="./icons/book-open.svg">
-<link rel="stylesheet" href="./reader.css?v=2"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css">
-<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=4"></script></head>
+<link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css">
+<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=5"></script></head>
 <body class="course">
 <header><div class="brand"><img src="icons/book-open.svg" alt="">研读</div><a href="./">论文阅读</a><strong class="mode">课程学习</strong>
 <div class="project-picker"><select id="projects" aria-label="当前课程项目"></select><button id="addProject" disabled>新建项目</button></div>
@@ -20,13 +20,14 @@
 <div id="activity" role="status" hidden></div>
 </section>
 <aside id="side"><div id="paneDivider" role="separator" tabindex="0" aria-label="课件与问答分栏宽度" aria-orientation="vertical" aria-controls="reading side"></div>
-<div class="side-head"><span>课程问答</span><button class="mobile-only" id="closeChat">看课件</button></div>
+<div class="side-head"><span>课程问答</span><button id="courseNotes" disabled>课程笔记</button><button class="mobile-only" id="closeChat">看课件</button></div>
 <div id="messages" aria-live="polite"></div>
 <form id="composer"><small id="scopeHint">请先打开课件</small><textarea id="question" rows="2" maxlength="6000" aria-label="课程问题" placeholder="问问这一页…"></textarea>
 <div class="compose-bottom"><small id="inputMode"></small><button id="send" type="submit" aria-label="发送问题" disabled><img src="icons/arrow-up.svg" alt=""></button></div></form>
 <div class="status" id="keyStatus"></div></aside>
 <button class="mobile-only" id="openChat">课程问答</button>
 </main>
+<dialog id="courseNotesDialog"><form method="dialog" class="dialog-head"><h2>课程笔记</h2><button aria-label="关闭">×</button></form><section class="note-clips" id="courseClips"></section></dialog>
 <dialog id="projectDialog"><form method="dialog" class="dialog-head"><h2>新建课程项目</h2><button aria-label="关闭">×</button></form><form id="newProject"><label>项目名称<input id="projectName" maxlength="80" required placeholder="例如：计算机组成原理"></label><p>同一项目的课件、学习进度和问答保存在此浏览器。</p><button class="primary">创建项目</button></form></dialog>
 <dialog id="settingDialog"><form method="dialog" class="dialog-head"><h2>课程问答设置</h2><button aria-label="关闭">×</button></form><form id="setup">
 <label>模型服务<select id="provider"><option value="deepseek">DeepSeek 官方</option><option value="openai">OpenAI 官方</option></select></label><label>模型名称<input id="model" maxlength="100" required pattern="[A-Za-z0-9._:\-]+"></label>
