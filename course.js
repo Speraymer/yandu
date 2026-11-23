@@ -1,4 +1,3 @@
-import {bindModelChoices} from './model-choices.js?v=4';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips} from './note-clips.js?v=3';
 import {slideTextLayer} from './slide-text.js';
@@ -9,7 +8,7 @@ import {exportCoursePack,importCoursePack} from './course-pack.js';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
-import {selectedProvider, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=8';
+import {defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=8';
 
 const $ = id => document.getElementById(id);
 function node(tag, text, cls) {
@@ -37,9 +36,9 @@ $('question').oninput = () => {
   if ($('question').value) drafts.set(chatKey(),$('question').value);
   else drafts.delete(chatKey());
 };
-let provider = selectedProvider(localGet('reader.provider'));
+let provider = localGet('reader.provider') === 'openai' ? 'openai' : 'deepseek';
 const modelFor = p => localGet('reader.model.' + p) || defaultModel(p);
-const visionEnabled = p => p === 'tongji' ? localGet('course.vision.tongji') === 'true' : p === 'openai' && localGet('course.vision') !== 'false';
+const visionEnabled = p => p === 'openai' && localGet('course.vision') !== 'false';
 const withImage = () => visionEnabled(provider);
 
 function sync() {
@@ -353,9 +352,7 @@ enableClipSelection(article=>{
 });
 
 const keyLoad = restoreKeys().catch(() => activity('已保存的密钥读取失败，可在 AI 设置中填写。'));
-const refreshModelChoices = bindModelChoices($('provider'));
 function fields() {
-  refreshModelChoices();
   const p = $('provider').value;
   $('model').value = modelFor(p); $('key').value = ''; $('remember').checked = remembersKey(p);
   $('forgetKey').hidden = !hasKey(p); $('visionOption').hidden = p === 'deepseek';
@@ -377,7 +374,7 @@ action('setup','submit',async e => {
     await configureKey(p,$('key').value.trim(),$('remember').checked);
     provider = p;
     localSet('reader.provider',p); localSet('reader.model.'+p,$('model').value.trim());
-    if (p !== 'deepseek') localSet(p === 'tongji' ? 'course.vision.tongji' : 'course.vision',String($('vision').checked));
+    if (p === 'openai') localSet('course.vision',String($('vision').checked));
     $('settingDialog').close(); sync();
   } catch(err) { $('configError').textContent = err.message; }
   finally { $('setup').inert = false; }
