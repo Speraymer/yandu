@@ -1,5 +1,6 @@
 import {onFileDrop} from './file-drop.js';
 import './pane-divider.js';
+import {recallTurns} from './course-context.js?v=3';
 import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
 import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
@@ -26,7 +27,7 @@ document.querySelectorAll('[data-icon]').forEach(button => {
 });
 let doc, currentFile, rows = [], pageNo = 1, zoom = 1, selected = null, busy = false;
 let paperId='',paperTurns=[],tocPromise=null;
-let history = [], versions = 0, observer, loadSerial = 0;
+let versions = 0, observer, loadSerial = 0;
 let translationOpen = false, drawingWidth = 0, flashTimer;
 const defaultModels = {deepseek:'deepseek-flash',openai:'gpt-4.1-mini'};
 function notice(message) {
@@ -46,7 +47,37 @@ function teachingQuestion(q){
   return [stylePrompts[styleChoice()],depth,'需要公式时用 LaTeX，以 $...$ 或 $$...$$ 分隔。','读者偏好：'+(localGet('reader.preferences')||'无'), '当前问题：'+q].join('\n');
 }
 const modelFor = p => localGet('reader.model.' + p) || defaultModels[p];
+function turnPage(t){
+  if (Number.isInteger(t?.chatPage)) return t.chatPage;
+  return Number(/^第 (\d+) 页/.exec(t?.source || '')?.[1]) || t?.quote?.from || 0;
+}
+function visibleChatPage(){
+  if ($('scope').value === 'all') return 0;
+  if ($('scope').value === 'selection') return selected?.from || turnPage(paperTurns.find(t=>t.id===selected?.turnId)) || pageNo;
+  return pageNo;
+}
+function tagMessage(msg,n){
+  msg.dataset.chatPage = n;
+  msg.hidden = !!visibleChatPage() && n !== visibleChatPage();
+  return msg;
+}
+function revealTurn(turn){
+  if ($('scope').value !== 'all'){
+    const n = turnPage(turn);
+    clearComposerQuote();
+    $('scope').value = n ? 'page' : 'all';
+    if(n) go(n);
+    showScope();
+  }
+  panel('chat');
+}
 function status() {
+  const n = visibleChatPage(), log = $('messages');
+  if (log.dataset.filter !== String(n)){
+    log.dataset.filter = n;
+    for(const msg of log.querySelectorAll('[data-chat-page]')) msg.hidden = !!n && Number(msg.dataset.chatPage)!==n;
+    log.scrollTop = log.scrollHeight;
+  }
   const p = provider;
   $('keyStatus').textContent = styleNames[styleChoice()]+' · '+(hasKey(p) ? modelFor(p) : '请在上方配置密钥');
   
@@ -112,7 +143,9 @@ $('reading').addEventListener('scroll', () => {
   if(!rows.length)return;
   const top=readingMarker();
   const next=rows.findIndex(entry=>entry.row.getBoundingClientRect().bottom>top);
-  const visiblePage=next<0?rows.length:next+1;
+  const reading = $('reading');
+  const atEnd = reading.scrollTop > 0 && reading.scrollTop + reading.clientHeight >= reading.scrollHeight - 1;
+  const visiblePage=atEnd || next<0 ? rows.length : next+1;
   if(paperId){
     localSet('reader.page.'+paperId,String(visiblePage));
     localSet('reader.position.'+paperId,visiblePage+' '+pagePosition(visiblePage));
@@ -203,7 +236,7 @@ async function openPDF(file,name,knownId,progress) {
     resetStudy(); doc=next;currentFile=file;paperId=id;paperTurns=turns.sort((a,b)=>a.time-b.time);tocPromise=null;
     setPaperControls(true);
     localSet('reader.lastPaper',id);
-    rows=pages; history=[]; selected=null;translationOpen=false;
+    rows=pages; selected=null;translationOpen=false;
     const resumePage=Number(localGet('reader.page.'+id))||1;
     updateTranslationAction(); $('translate').classList.remove('active');$('quote').hidden=true;$('scope').value='all';$('scope').options[2].disabled=true;
     $('messages').replaceChildren(welcome);$('question').value='';$('title').textContent=name;$('title').title=name;document.title=name+' · 研读';
@@ -319,12 +352,30 @@ async function storeTurn(turn){
   }
   try{await saveTurn(turn);}catch{notice('问答记录保存失败，请检查本机存储空间。');}
 }
+function memoryLinks(reply,turn){
+  if (!turn.memoryIds?.length) return;
+  const links = el('details','');
+  links.append(el('summary','','本次参考的其他问答'));
+  for (const id of turn.memoryIds){
+    const source = paperTurns.find(t=>t.id===id && t.thread==='main');
+    if (!source) continue;
+    const page = turnPage(source);
+    const link = el('button','cite',(page?'第 '+page+' 页':'全文讨论')+'：'+source.question.slice(0,160));
+    link.onclick=()=>{
+      revealTurn(source);
+      $('messages').querySelector('[data-question-id="'+CSS.escape(id)+'"]')?.scrollIntoView({block:'nearest'});
+    };
+    links.append(link);
+  }
+  if(links.childElementCount>1)reply.append(links);
+}
 function replayTurn(turn,target,legacyFirst=false){
   const user=addMessage('user',turn.question,turn.label,target,turn.id);
   const citation=turn.replyQuote||(turn.thread==='main'?turn.quote:null);
   if(citation)user.querySelector(".msg-body").before(quoteBlock(citation));
   if(turn.quote && (turn.firstQuote ?? legacyFirst))user.querySelector(".msg-body").before(quoteBlock(turn.quote));
   const reply=addMessage('assistant',turn.answer||turn.error||'未收到完整答复，可重新提问。',turn.model,target,turn.answer?turn.id:null);
+  if(target===$('messages')) { tagMessage(user,turnPage(turn)); tagMessage(reply,turnPage(turn)); memoryLinks(reply,turn); }
   if(turn.answer)saveNoteButton(reply,turn.source,turn.question,turn.answer);
 }
 function recentMessages(turns){
@@ -338,7 +389,7 @@ function recentMessages(turns){
 function restoreChat(){
   const main=paperTurns.filter(t=>t.thread==='main');
   for(const turn of main)replayTurn(turn,$('messages'));
-  history=recentMessages(main);
+
 }
 async function chatRequest(q, material, previous){
   return complete({provider,model:modelFor(provider),question:teachingQuestion(q),context:material,history:previous.slice(-8)});
@@ -353,30 +404,38 @@ async function ask(question,scope=$('scope').value,n=pageNo) {
   const returnScope=scopeBeforeQuote;
   setBusy(true);let pending,turn,consumed=false;
   try {
-    const material=await context(scope,n,quote,rows);
+    let material=await context(scope,n,quote,rows);
     if(doc!==ref)return;
     const label=scope==='all'?'你 · 全文':scope==='selection'?'你 · 选区':'你 · 第 '+n+' 页';
     turn=newTurn('main',question,label,materialScope(scope,n,quote),quote);
+    turn.chatPage = scope==='all' ? 0 : scope==='page' ? n : quote?.from || turnPage(paperTurns.find(t=>t.id===quote?.turnId)) || n;
+    const main = paperTurns.filter(t=>t.thread==='main' && t.paper===turn.paper);
+    const previous = recentMessages(main.filter(t=>turnPage(t)===turn.chatPage));
+    const memories = recallTurns(main.map(t=>({...t,project:t.paper,deck:t.paper,page:turnPage(t),name:''})),
+      {project:turn.paper,deck:turn.paper,page:turn.chatPage,question},scope==='all'?'':material);
+    turn.memoryIds = memories.map(t=>t.id);
+    if(memories.length) material += '\n同篇论文其他讨论的摘录，仅供参考，论文事实以原文为准：\n' +
+      memories.map(t=>(t.page?'第 '+t.page+' 页':'全文讨论')+'\n问：'+t.question.slice(0,400)+'\n答：'+t.answer.slice(0,1000)).join('\n');
     await storeTurn(turn);if(ref!==doc)return;
     panel('chat');const userMsg=addMessage('user',question,label,$('messages'),turn.id);
+    tagMessage(userMsg,turn.chatPage);
     if(quote){
       userMsg.querySelector(".msg-body").before(quoteBlock(quote));
       if(selected===quote && $('scope').value==='selection'){clearComposerQuote();consumed=true;}
     }
     if(field.value.trim()===question)field.value='';
-    pending=addMessage('assistant','正在阅读原文…',model);
-    const result=await chatRequest(question,material,history);
+    pending=tagMessage(addMessage('assistant','正在阅读原文…',model),turn.chatPage);
+    const result=await chatRequest(question,material,previous);
     turn.answer=result.answer;await storeTurn(turn);
     if(doc!==ref)return;
     pending.remove();const reply=addMessage('assistant',result.answer,model,$('messages'),turn.id);
     saveNoteButton(reply,materialScope(scope,n,quote),question,result.answer);
-    history.push({role:'user',content:quotePrefix(quote)+question},{role:'assistant',content:result.answer});
-    history=history.slice(-8).map(m=>({...m,content:m.content.slice(0,12000)}));
+    tagMessage(reply,turn.chatPage); memoryLinks(reply,turn);
   }catch(err){
     if(turn&&!turn.answer){turn.error=err.message;await storeTurn(turn);}
     pending?.remove();
     if(doc===ref){
-      panel('chat');addMessage('assistant',err.message,'发送失败');
+      panel('chat');tagMessage(addMessage('assistant',err.message,'发送失败'),turn?.chatPage ?? n);
       if(!field.value && (!selected || selected===quote)){
         field.value=question;
         if(consumed && !selected && $('scope').value===returnScope)attachQuote(quote);
@@ -506,7 +565,7 @@ $('conversations').onclick=()=>{
       button.onclick=()=>{
         $('browserDialog').close();
         let log=$('messages');
-        if(id==='main')panel('chat');
+        if(id==='main')revealTurn(turn);
         else{
           const existing=[...threads].find(f=>f.id===id);
           const box=existing?.box||openThread(quote,id,turns);
@@ -802,7 +861,7 @@ function openThread(quote,id=crypto.randomUUID(),turns=[]){
     if(quote.kind==='answer'){
       const turn=paperTurns.find(t=>t.id===quote.turnId);
       if(!turn){notice('这条来源回答尚未载入。');return;}
-      if(turn.thread==='main')panel('chat');
+      if(turn.thread==='main')revealTurn(turn);
       else{
         const parent=[...threads].find(t=>t.id===turn.thread);
         if(parent)$('floatLayer').append(parent.box);

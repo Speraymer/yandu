@@ -49,7 +49,11 @@ function readingData(data) {
     check([thread,question,label,source,model].every(text) && thread && (thread === 'main' || turn.quote));
     check((answer == null || text(answer)) && (error == null || text(error)));
     turnIds.add(turnId);
+    if (turn.memoryIds !== undefined) check(Array.isArray(turn.memoryIds) && turn.memoryIds.length<=3 && turn.memoryIds.every(text));
+    if (turn.chatPage !== undefined) check(Number.isInteger(turn.chatPage) && turn.chatPage>=0 && turn.chatPage<=pages);
     return {paper,id:turnId,thread,time,question,label,source,model,answer,error,
+      ...(turn.memoryIds?.length ? {memoryIds:turn.memoryIds} : {}),
+      ...(turn.chatPage !== undefined ? {chatPage:turn.chatPage} : {}),
       firstQuote:typeof firstQuote === 'boolean' ? firstQuote : undefined,
       quote:quoteData(turn.quote,pages),replyQuote:quoteData(turn.replyQuote,pages)};
   })};
