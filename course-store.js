@@ -42,6 +42,17 @@ export async function addDeck(project, name, pages) {
   return deck;
 }
 
+// Commit page images and their matching text coordinates together, keeping the original deck ID.
+export async function restoreSlideSelection(deck,pages){
+  if (pages.length!==deck.texts.length || pages.some((p,i)=>p.text!==deck.texts[i]))
+    throw Error('原文件与当前课件的页数或文字不同，请选择导入时的文件。');
+  if (!pages.some(p=>p.layout?.runs.length)) throw Error('原文件没有可定位的文字。');
+  await access('images','readwrite',tx=>{
+    const images=tx.objectStore('images');
+    pages.forEach(({image,layout},i)=>images.put({image,layout},[deck.id,i+1]));
+  });
+}
+
 export async function setLearned(id, page, value, automatic = false) {
   let learned;
   await access('decks','readwrite',tx => {

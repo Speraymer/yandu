@@ -51,3 +51,5 @@ header a:hover,.course-entry:hover {color:var(--primary);text-decoration:underli
 #plainSource{background:var(--panel);padding:6px 16px;font-size:13px}
 #plainSource summary{cursor:pointer}
 #plainBody{max-height:28vh;overflow:auto;white-space:pre-wrap;padding:8px 0;line-height:1.65;user-select:text}
+#repairBar{padding:6px 16px;background:var(--tint);font-size:13px}
+#repairSelection{color:var(--primary);text-decoration:underline;font-weight:650}

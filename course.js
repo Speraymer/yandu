@@ -3,7 +3,7 @@ import {enableClipSelection,renderClips} from './note-clips.js?v=2';
 import {slideTextLayer} from './slide-text.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
-import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js?v=3';
+import {projects, newProject, projectRecords, addDeck, restoreSlideSelection, slideImage, setLearned, saveTurn} from './course-store.js?v=4';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
@@ -43,6 +43,7 @@ function sync() {
   const ready = !!(deck && currentImage);
   $('courseNotes').disabled = !project;
   $('import').disabled = !project || importing;
+  $('repairSelection').disabled=importing;
   $('projects').disabled = importing || !projectList.length;
   $('addProject').disabled = importing;
   $('start').disabled = importing;
@@ -84,6 +85,7 @@ function clearImage() {
   }
   if (currentImage) URL.revokeObjectURL(currentImage.url);
   currentImage = null;
+  $('repairBar').hidden=true;
   $('slide').hidden = true;
   $('slide').removeAttribute('src');
 }
@@ -102,6 +104,8 @@ async function showPage(n) {
   $('slide').alt = deck.name + '，第 ' + page + ' 页。' + deck.texts[page-1].slice(0,300);
   $('slide').hidden = false;
   drawSource(stored.layout);
+  $('repairBar').hidden=!(stored instanceof Blob && deck.texts[page-1].trim());
+  $('slide').title=stored.layout?.runs.length?'拖选画面中的文字可写入笔记':'';
   $('plainSource').hidden=false;
   $('plainBody').textContent=deck.texts[page-1] || '本页没有可提取的文字。';
   localSet('course.page.'+deck.id,String(page));
@@ -201,24 +205,49 @@ action('files','change',() => {
   $('files').value = '';
   return importFiles(files);
 });
+let repairTarget;
+$('repairSelection').onclick=()=>{
+  repairTarget=deck;
+  $('repairFile').click();
+};
+action('repairFile','change',async ()=>{
+  const file=$('repairFile').files[0],target=repairTarget;
+  $('repairFile').value='';
+  if (!file || !target || importing) return;
+  importing=true;sync();
+  try {
+    activity('正在补全 '+target.name+' 的文字位置…');
+    const pages=await readSlides(file,(n,total)=>activity('正在处理第 '+n+' / '+total+' 页'));
+    await restoreSlideSelection(target,pages);
+    if(deck?.id===target.id)await showPage(page);
+    activity('已启用画面划词。拖选文字后可写入笔记。');
+  } finally { importing=false;sync(); }
+});
 async function importFiles(files) {
   if (importing || !files.length || !project) return;
   const target = project.id;
   importing = true; sync();
   const errors = [];
-  let first;
+  let first, restored=0, added=0;
   try {
     for (const file of files) {
       try {
         activity('正在打开 ' + file.name + '…');
         const pages = await readSlides(file,(n,total) => activity('正在读取 ' + file.name + '，第 ' + n + ' / ' + total + ' 页'));
+        const same=decks.filter(d=>d.name===file.name && d.texts.length===pages.length && d.texts.every((text,i)=>text===pages[i].text));
+        if(same.length===1 && await slideImage(same[0].id,1) instanceof Blob && pages.some(p=>p.layout?.runs.length)){
+          await restoreSlideSelection(same[0],pages);
+          restored++;
+          if(!first)first=same[0].id;
+          continue;
+        }
         const item = await addDeck(target,file.name,pages);
         if (!first) first = item.id;
-        decks.push(item);
+        decks.push(item);added++;
       } catch(err) { errors.push(file.name + '：' + (err.name === 'QuotaExceededError' ? '浏览器存储空间不足。' : err.message)); }
     }
-    if (first) await openDeck(first);
-    activity(errors.length ? errors.join('　') : '已导入 ' + files.length + ' 份课件。');
+    if (first) await openDeck(first,first===deck?.id?page:undefined);
+    activity([added && '已导入 '+added+' 份课件。', restored && '已为 '+restored+' 份已有课件启用画面划词。', ...errors].filter(Boolean).join('　'));
   } finally { importing = false; sync(); }
 }
 
