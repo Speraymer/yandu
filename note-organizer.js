@@ -1,4 +1,4 @@
-import {complete,hasKey} from './model-api.js?v=9';
+import {complete,hasKey} from './model-api.js?v=10';
 import {loadClips} from './note-clips.js?v=3';
 import {formatMessage} from './answer.js?v=6';
 import {localGet,localSet} from './reader-storage.js';
@@ -40,7 +40,7 @@ export function bindOrganizer({editor,status,dialog,scope,storage,title,service}
       const config=service();
       if(!hasKey(config.provider))throw Error('请先在 AI 设置中填写密钥，再整理笔记。');
       run.disabled=true;run.textContent='整理中…';status.textContent='AI 正在整理摘录和正文…';
-      const {answer}=await complete({...config,organize:true,question:'整理成完整、可独立阅读的学习笔记。',context:JSON.stringify({主题:title(),已有正文:before,摘录:clips})});
+      const {answer}=await complete({...config,organize:true,question:'精简整理原有笔记和摘录，只纠正明确的错漏。',context:JSON.stringify({主题:title(),已有正文:before,摘录:clips})});
       if(token!==generation || scope()!==id || !dialog.open)return;
       if(editor.value!==before || localGet(key)!==persisted)throw Error('整理期间正文有修改，请重新整理。');
       if(!localSet(key+'.beforeOrganize',before) || !localSet(key,answer))throw Error('存储空间不足，请释放空间后重新整理。');
