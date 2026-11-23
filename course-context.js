@@ -43,8 +43,27 @@ export function courseContext(project, decks, deckId, page, question) {
   return parts.join('\n');
 }
 
-export function courseHistory(turns, projectId) {
-  return turns.filter(t => t.project === projectId && t.answer).slice(-4).flatMap(t => [
+export function pageTurns(turns, projectId, deckId, page) {
+  return turns.filter(t => t.project === projectId && t.deck === deckId && t.page === page);
+}
+
+export function recallTurns(turns, current, slideText) {
+  const query = terms(current.question), topic = terms(slideText.slice(0,600));
+  const ranked = [];
+  for (const t of turns) {
+    if (!t.answer || t.project !== current.project || (t.deck === current.deck && t.page === current.page)) continue;
+    const tokens = terms(t.name + ' ' + t.question + ' ' + t.answer.slice(0,1000));
+    let score = 0;
+    for (const token of tokens) score += (query.has(token) ? 4 : 0) + (topic.has(token) ? 1 : 0);
+    if (t.deck === current.deck && Math.abs(t.page-current.page) === 1) score += 3;
+    if (/刚才|上次|之前|前面/.test(current.question) && t === turns.findLast(x => x.project === current.project && x.answer)) score += 10;
+    if (score) ranked.push({t,score});
+  }
+  return ranked.sort((a,b) => b.score-a.score || b.t.time-a.t.time).slice(0,3).map(entry => entry.t);
+}
+
+export function courseHistory(turns, projectId, deckId, page) {
+  return pageTurns(turns,projectId,deckId,page).filter(t => t.answer).slice(-4).flatMap(t => [
     {role:'user',content:'当时正在读《' + t.name + '》第 ' + t.page + ' 页。\n' + t.question},
     {role:'assistant',content:t.answer.slice(0,4000)}
   ]);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {courseContext, courseHistory} from '../course-context.js';
+import {courseContext, courseHistory, recallTurns} from '../course-context.js';
 import {complete, configureKey} from '../model-api.js';
 
 test('the same slide number in different courses keeps its own material, history and progress', () => {
@@ -14,8 +14,8 @@ test('the same slide number in different courses keeps its own material, history
   assert.match(ctx,/逻辑分析仪/);
   assert.doesNotMatch(ctx,/外部材料|其他课程/);
   assert.throws(() => courseContext({id:'a'},materials,'other',1,'问题'));
-  const turn = {project:'a',name:'实验',page:3,question:'上一题',answer:'上一答'};
-  assert.deepEqual(courseHistory([turn,{...turn,project:'b',answer:'其他课程回复'}],'a'),
+  const turn = {project:'a',deck:'two',name:'实验',page:3,question:'上一题',answer:'上一答'};
+  assert.deepEqual(courseHistory([turn,{...turn,project:'b',answer:'其他课程回复'}],'a','two',3),
     [{role:'user',content:'当时正在读《实验》第 3 页。\n上一题'},{role:'assistant',content:'上一答'}]);
 });
 
@@ -33,4 +33,13 @@ test('the vision request attaches the pinned page, text requests stay text-only'
   assert.equal(bodies[0].at(-1).content[1].image_url.url,image);
   assert.equal(typeof bodies[1].at(-1).content,'string');
   assert.match(bodies[0][0].content,/课程辅导/);
+});
+
+test('recall and page history stay separate across slides, decks and projects', () => {
+  const current = {project:'A',deck:'X',page:2,question:'Cache 映射'};
+  const turn = {...current,name:'第一讲',question:'Cache',answer:'映射方式',time:1};
+  const other = {...turn,deck:'Y'};
+  const rows = [turn,other,{...turn,project:'B'},{...turn,page:3,answer:''}];
+  assert.deepEqual(recallTurns(rows,current,'缓存'),[other]);
+  assert.equal(courseHistory(rows,'A','X',2).length,2);
 });

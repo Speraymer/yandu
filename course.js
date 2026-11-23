@@ -2,7 +2,7 @@ import {onFileDrop} from './file-drop.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
 import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js?v=2';
-import {courseContext, courseHistory} from './course-context.js?v=2';
+import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=3';
 import {readSlides} from './course-import.js';
 import {formatMessage} from './answer.js?v=6';
 import {restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=3';
@@ -26,7 +26,13 @@ function action(id, event, fn) {
 }
 let projectList = [], project, decks = [], deck, turns = [], page = 1;
 let view = 0, projectVersion = 0, currentImage, importing = false;
-const pending = new Set();
+const pending = new Map();
+const drafts = new Map();
+const chatKey = () => deck ? deck.id + '/' + page : '';
+$('question').oninput = () => {
+  if ($('question').value) drafts.set(chatKey(),$('question').value);
+  else drafts.delete(chatKey());
+};
 let provider = localGet('reader.provider') === 'openai' ? 'openai' : 'deepseek';
 const modelFor = p => localGet('reader.model.' + p) || (p === 'openai' ? 'gpt-4.1-mini' : 'deepseek-flash');
 const withImage = () => provider === 'openai' && localGet('course.vision') !== 'false';
@@ -52,10 +58,10 @@ function sync() {
     $('learned').checked = deck.learned[page-1];
     $('deckStats').textContent = '已学 ' + deck.learned.filter(Boolean).length + ' / ' + deck.texts.length + ' 页';
   }
-  $('send').disabled = !ready || pending.has(project?.id);
+  $('send').disabled = !ready || pending.has(chatKey());
   $('scopeHint').textContent = deck ? '当前页：《' + deck.name + '》第 ' + page + ' 页' : '请先打开课件';
   $('inputMode').textContent = withImage() ? '附本页图文' : deck && !deck.texts[page-1].trim() ? '本页无文字层；看图请在 AI 设置启用支持图片的模型。' : '发送可提取的文字';
-  $('keyStatus').textContent = pending.has(project?.id) ? '正在回答…' :
+  $('keyStatus').textContent = pending.has(chatKey()) ? '正在回答…' :
     hasKey(provider) ? modelFor(provider) : '使用课程问答前，请填写 AI 设置。';
 }
 function updateDeckOptions() {
@@ -80,7 +86,7 @@ async function showPage(n) {
   const token = ++view;
   if (!deck) { clearImage(); sync(); return; }
   page = Math.max(1, Math.min(deck.texts.length, Math.floor(Number(n)) || 1));
-  clearImage(); sync();
+  clearImage(); $('question').value = drafts.get(chatKey()) || ''; drawChat(); sync();
   const blob = await slideImage(deck.id, page);
   if (token !== view) return;
   if (!blob) throw Error('本页图像无法读取，请重新导入原课件。');
@@ -210,21 +216,32 @@ async function importFiles(files) {
 function drawChat() {
   const log = $('messages');
   log.replaceChildren();
-  if (!turns.length) {
+  const thread = pageTurns(turns,project?.id,deck?.id,page);
+  if (!thread.length) {
     const w = node('section','');
     w.id = 'welcome';
-    w.append(node('h1','一起读课件'),node('p','翻到想问的那一页，直接提问。你也可以问它和前几讲有什么联系。'));
+    w.append(node('h1','本页问答'),node('p','每页单独保存问答。提问时会参考这门课其他页的相关讨论。'));
     log.append(w); return;
   }
-  for (const t of turns) {
+  for (const t of thread) {
     const user = node('article','','msg user'), role = node('div','你','msg-role');
     const source = node('button','《' + t.name + '》第 ' + t.page + ' 页');
     source.title = '返回提问时的课件页';
     source.onclick = () => { if (matchMedia('(max-width:740px)').matches) $('side').hidden = true; openDeck(t.deck,t.page).catch(problem); };
     role.append(source); user.append(role,node('div',t.question,'msg-body')); log.append(user);
     const reply = node('article','','msg assistant'), body = node('div','','msg-body');
-    formatMessage(body,t.answer || t.error || (pending.has(t.project) ? '正在回答…' : '本次提问未收到完整回复。'),() => null);
+    formatMessage(body,t.answer || t.error || (pending.get(chatKey()) === t.id ? '正在回答…' : '本次提问未收到完整回复。'),() => null);
     reply.append(node('div',t.model,'msg-role'),body); log.append(reply);
+    if (t.memory?.length) {
+      const sources = document.createElement('details');
+      sources.append(node('summary','本次参考的跨页问答'));
+      for (const m of t.memory) {
+        const link = node('button','《' + m.name + '》第 ' + m.page + ' 页：' + m.question);
+        link.onclick = () => openDeck(m.deck,m.page).catch(problem);
+        sources.append(link);
+      }
+      reply.append(sources);
+    }
   }
   log.scrollTop = log.scrollHeight;
 }
@@ -267,28 +284,35 @@ function dataUrl(blob) {
 action('composer','submit', async e => {
   e.preventDefault();
   const question = $('question').value.trim();
-  if (!question || !project || !deck || !currentImage || pending.has(project.id)) return;
+  if (!question || !project || !deck || !currentImage || pending.has(chatKey())) return;
   if (!hasKey(provider)) { await settings(); return; }
   const owner = project, id = owner.id, service = provider, image = withImage() ? currentImage.blob : null;
   const turn = {id:crypto.randomUUID(), project:id, deck:deck.id, name:deck.name, page, question,
     time:Date.now(), model:modelFor(service)};
-  pending.add(id); sync();
+  const key = chatKey();
+  pending.set(key,turn.id); sync();
   try {
     const [materials, history] = await Promise.all([projectRecords('decks',id),projectRecords('turns',id)]);
-    const context = courseContext(owner,materials,turn.deck,turn.page,question);
+    let context = courseContext(owner,materials,turn.deck,turn.page,question);
+    const text = materials.find(d => d.id === turn.deck).texts[turn.page-1];
+    const memory = recallTurns(history,turn,text);
+    turn.memory = memory.map(({name,deck,page,question}) => ({name,deck,page,question:question.slice(0,160)}));
+    if (memory.length) context += '\n同课程其他页的历史问答摘录（供联系知识点，课件事实以原文为准）：\n' +
+      memory.map(m => '《' + m.name + '》第 ' + m.page + ' 页\n问：' + m.question.slice(0,400) + '\n答：' + m.answer.slice(0,1000)).join('\n');
     await saveTurn(turn);
+    if (drafts.get(key)?.trim() === question) drafts.delete(key);
     if (project?.id === id) {
-      turns = [...history,turn]; if ($('question').value.trim() === question) $('question').value = ''; drawChat();
+      turns = [...turns.filter(t => t.id !== turn.id),turn]; if (chatKey() === key && $('question').value.trim() === question) $('question').value = ''; drawChat();
     }
     try {
       const result = await complete({course:true, provider:service, model:turn.model, question,
-        context, history:courseHistory(history,id), image:image ? await dataUrl(image) : null});
+        context, history:courseHistory(history,id,turn.deck,turn.page), image:image ? await dataUrl(image) : null});
       turn.answer = result.answer;
     } catch(err) { turn.error = err.message; }
     await saveTurn(turn);
     const updated = await projectRecords('turns',id);
     if (project?.id === id) { turns = updated; drawChat(); }
-  } finally { pending.delete(id); sync(); }
+  } finally { pending.delete(key); sync(); }
 });
 $('question').onkeydown = e => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('composer').requestSubmit(); }
