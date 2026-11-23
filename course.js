@@ -1,3 +1,4 @@
+import {onFileDrop} from './file-drop.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
 import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js';
@@ -40,7 +41,7 @@ function sync() {
   $('empty').hidden = !!deck;
   if (!deck) {
     $('emptyTitle').textContent = project ? '加入第一份课件' : '从一门课程开始';
-    $('emptyText').textContent = project ? '可以一次选择多份 PPTX 或 PDF，按课件逐页学习。' : '为这门课建一个项目，把每次上课的课件放在一起。';
+    $('emptyText').textContent = project ? '可以一次拖入或选择多份 PPTX 或 PDF，按课件逐页学习。' : '为这门课建一个项目，把每次上课的课件放在一起。';
     $('start').textContent = project ? '选择课件' : '新建课程项目';
   } else {
     $('courseStats').textContent = project.name + '，共 ' + decks.length + ' 份课件';
@@ -124,7 +125,9 @@ action('newProject','submit',async e => {
   $('newProject').inert = true;
   try {
     const item = await newProject(name);
+    const files = waitingFiles;
     $('projectDialog').close(); await refreshProjects(item.id);
+    if (files.length) await importFiles(files);
   } finally { $('newProject').inert = false; }
 });
 action('projects','change',() => selectProject($('projects').value));
@@ -149,9 +152,20 @@ action('learned','change',() => mark(page,$('learned').checked));
 action('allLearned','click',() => mark(null,true));
 action('allNew','click',() => mark(null,false));
 
-action('files','change',async () => {
+let waitingFiles = [];
+$('projectDialog').addEventListener('close', () => { waitingFiles = []; });
+onFileDrop('松开以导入课程课件', files => {
+  if (importing) return activity('正在导入课件，请等本批完成后再拖入。');
+  if (!files.length) return activity('请拖入 PPTX 或 PDF 文件。');
+  if (!project) { waitingFiles = files; projectDialog(); return; }
+  importFiles(files).catch(problem);
+});
+action('files','change',() => {
   const files = [...$('files').files];
   $('files').value = '';
+  return importFiles(files);
+});
+async function importFiles(files) {
   if (importing || !files.length || !project) return;
   const target = project.id;
   importing = true; sync();
@@ -170,7 +184,7 @@ action('files','change',async () => {
     if (first) await openDeck(first);
     activity(errors.length ? errors.join('　') : '已导入 ' + files.length + ' 份课件。');
   } finally { importing = false; sync(); }
-});
+}
 
 function drawChat() {
   const log = $('messages');

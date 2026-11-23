@@ -5,3 +5,5 @@
 
 
 .course-entry{color:var(--purple);font-size:13px;text-decoration:none;white-space:nowrap}.course-entry:hover{text-decoration:underline}
+
+.file-drop-hint{position:fixed;inset:12px;z-index:999;display:grid;place-items:center;pointer-events:none;border:3px dashed var(--primary);border-radius:12px;background:var(--glass);color:var(--primary);font-size:20px;font-weight:650}

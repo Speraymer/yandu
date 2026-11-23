@@ -1,3 +1,4 @@
+import {onFileDrop} from './file-drop.js';
 import './pane-divider.js';
 import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
@@ -230,6 +231,10 @@ async function openPDF(file,name,knownId,progress) {
     if(serial===loadSerial)notice('无法打开这份 PDF：'+err.message);
   }
 }
+onFileDrop('松开以打开论文 PDF', files => {
+  if (files.length !== 1 || !/\.pdf$/i.test(files[0].name)) return notice('请一次拖入一份论文 PDF。');
+  openPDF(files[0],files[0].name).catch(err => notice(err.message));
+});
 $('upload').onclick=()=>$('file').click();
 $('file').onchange=async()=>{const f=$('file').files[0];if(f)await openPDF(f,f.name);$('file').value='';};
 function showScope(){

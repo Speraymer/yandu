@@ -2,7 +2,7 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com; base-uri 'none'; form-action 'none'; object-src 'none'">
-<title>研读 · 论文阅读器</title><link rel="icon" href="./icons/book-open.svg"><link rel="stylesheet" href="./reader.css"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><script type="module" src="./reader.js?v=9"></script><link rel="stylesheet" href="./theme.css?v=8"><script src="./theme.js"></script></head>
+<title>研读 · 论文阅读器</title><link rel="icon" href="./icons/book-open.svg"><link rel="stylesheet" href="./reader.css?v=2"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><script type="module" src="./reader.js?v=10"></script><link rel="stylesheet" href="./theme.css?v=8"><script src="./theme.js"></script></head>
 <body>
 <header><button class="brand" id="shelf" title="我的书架"><img src="icons/book-open.svg" alt="">书架</button><a class="course-entry" href="./course.html">课程学习</a><div class="paper-label" id="title">研读</div>
 <div class="tools">
@@ -14,7 +14,7 @@
 <button data-icon="upload" id="upload" title="打开本机 PDF">打开 PDF</button><input type="file" id="file" accept=".pdf,application/pdf" hidden>
 <button data-icon="settings-2" id="settings" title="设置模型、讲解风格与个人偏好">AI 设置</button></header>
 <main>
-<div id="reading"><section id="emptyShelf" hidden><img src="icons/book-open.svg" alt=""><h1>从一篇论文开始</h1><p>打开本机 PDF 加入书架。下次用同一浏览器打开这个链接，会接着上次的页码阅读。</p><button class="primary" id="firstOpen">选择 PDF</button><small>文档、译文、笔记和对话记录保存在此浏览器。</small></section><div id="sheets" aria-label="论文原文"></div><div id="notice" role="status" hidden></div></div>
+<div id="reading"><section id="emptyShelf" hidden><img src="icons/book-open.svg" alt=""><h1>从一篇论文开始</h1><p>拖入或选择本机 PDF，即可加入书架。下次用同一浏览器打开这个链接，会接着上次的页码阅读。</p><button class="primary" id="firstOpen">选择 PDF</button><small>文档、译文、笔记和对话记录保存在此浏览器。</small></section><div id="sheets" aria-label="论文原文"></div><div id="notice" role="status" hidden></div></div>
 <aside id="side"><div id="paneDivider" role="separator" tabindex="0" aria-label="论文和对话分栏宽度" aria-controls="reading side" aria-orientation="vertical" title="左右拖动调整栏宽，也可使用左右方向键"></div><div class="side-head"><span id="sideTitle">与 AI 一起读</span><button id="conversations" title="按提问跳转到对应问答">对话目录</button><button data-icon="panel-right-close" id="collapse" title="收起右栏"></button></div>
 <section id="chat">
 <div id="messages" aria-live="polite"><div id="welcome"><div class="ai-mark"><img src="icons/sparkles.svg" alt=""></div><h1>和这篇论文聊聊</h1><p>围绕全文提问，或在原文中划选一段细读。</p>
