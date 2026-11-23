@@ -1,8 +1,8 @@
 import {onFileDrop} from './file-drop.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
-import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js';
-import {courseContext, courseHistory} from './course-context.js';
+import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js?v=2';
+import {courseContext, courseHistory} from './course-context.js?v=2';
 import {readSlides} from './course-import.js';
 import {formatMessage} from './answer.js?v=6';
 import {restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=3';
@@ -64,6 +64,13 @@ function updateDeckOptions() {
   if (deck) $('decks').value = deck.id;
 }
 function clearImage() {
+  if (currentImage && (currentImage.deck !== deck || currentImage.page !== page)) {
+    const old = currentImage;
+    setLearned(old.deck.id,old.page,true,true).then(flags => {
+      old.deck.learned = flags;
+      if (deck === old.deck) { updateDeckOptions(); sync(); }
+    }).catch(problem);
+  }
   if (currentImage) URL.revokeObjectURL(currentImage.url);
   currentImage = null;
   $('slide').hidden = true;
@@ -71,15 +78,14 @@ function clearImage() {
 }
 async function showPage(n) {
   const token = ++view;
-  clearImage();
-  if (!deck) { sync(); return; }
+  if (!deck) { clearImage(); sync(); return; }
   page = Math.max(1, Math.min(deck.texts.length, Math.floor(Number(n)) || 1));
-  sync();
+  clearImage(); sync();
   const blob = await slideImage(deck.id, page);
   if (token !== view) return;
   if (!blob) throw Error('本页图像无法读取，请重新导入原课件。');
   const url = URL.createObjectURL(blob);
-  currentImage = {url, blob};
+  currentImage = {url, blob, deck, page};
   $('slide').src = url;
   $('slide').alt = deck.name + '，第 ' + page + ' 页。' + deck.texts[page-1].slice(0,300);
   $('slide').hidden = false;
@@ -137,10 +143,25 @@ action('prev','click',() => showPage(page-1));
 action('next','click',() => showPage(page+1));
 window.addEventListener('keydown', e => {
   if (!deck || document.querySelector('dialog[open]') || e.target.closest('input,select,textarea,button,summary,[role=separator]')) return;
-  if (['ArrowLeft','ArrowRight'].includes(e.key)) {
-    e.preventDefault(); showPage(page+(e.key === 'ArrowRight' ? 1 : -1)).catch(problem);
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+    e.preventDefault(); showPage(page+(['ArrowRight','ArrowDown'].includes(e.key) ? 1 : -1)).catch(problem);
   }
 });
+let lastWheel = 0, wheelDistance = 0, wheelTurned = false;
+$('stage').addEventListener('wheel', e => {
+  if (!deck || e.ctrlKey || !e.deltaY || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  e.preventDefault();
+  const now = performance.now();
+  if (now-lastWheel > 150 || Math.sign(wheelDistance) !== Math.sign(e.deltaY)) {
+    wheelDistance = 0; wheelTurned = false;
+  }
+  lastWheel = now;
+  wheelDistance += e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1);
+  if (!wheelTurned && Math.abs(wheelDistance) >= 35) {
+    wheelTurned = true;
+    showPage(page+Math.sign(wheelDistance)).catch(problem);
+  }
+}, {passive:false});
 async function mark(n,value) {
   if (!deck) return;
   const item = deck;

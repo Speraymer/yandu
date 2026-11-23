@@ -42,15 +42,23 @@ export async function addDeck(project, name, pages) {
   return deck;
 }
 
-export async function setLearned(id, page, value) {
+export async function setLearned(id, page, value, automatic = false) {
   let learned;
   await access('decks','readwrite',tx => {
     const store = tx.objectStore('decks');
     const get = store.get(id);
     get.onsuccess = () => {
       const deck = get.result;
-      if (page === null) deck.learned.fill(value);
-      else deck.learned[page-1] = value;
+      deck.manualUnread ??= [];
+      if (automatic && (deck.manualUnread[page-1] || deck.learned[page-1])) {
+        learned = deck.learned;
+        return;
+      }
+      if (page === null) {
+        deck.manualUnread = deck.learned.map(() => !value);
+        deck.learned.fill(value);
+      }
+      else { deck.learned[page-1] = value; deck.manualUnread[page-1] = !value; }
       learned = deck.learned;
       store.put(deck);
     };

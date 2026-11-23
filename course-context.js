@@ -23,7 +23,7 @@ export function courseContext(project, decks, deckId, page, question) {
   const label = (d,n) => '《' + d.name + '》第 ' + n + ' 页';
   const parts = ['课程项目：' + project.name, '提问时正在阅读：' + label(current,page),
     '当前页正文：\n' + (here.slice(0,14000) || '本页没有可提取的文字。'),
-    '课程学习记录（手动标记）：', ...own.map(d => '《' + d.name + '》共 ' + d.texts.length +
+    '课程学习记录：', ...own.map(d => '《' + d.name + '》共 ' + d.texts.length +
       ' 页；已学页：' + ranges(d.learned) + '；未学页：' + ranges(d.learned.map(v => !v)))];
   const query = terms(question), topic = terms(here.slice(0,600));
   const related = [];
