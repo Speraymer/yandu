@@ -87,14 +87,17 @@ function status() {
 }
 function panel(name) {
   $('side').hidden = name === 'closed';
-  $('chat').hidden = name !== 'chat'; $('notesPane').hidden = name !== 'notes';
+  $('chat').hidden = name !== 'chat';
   $('ai').classList.toggle('active',name==='chat'); $('note').classList.toggle('active',name==='notes');
   $('sideTitle').textContent = name === 'notes' ? '论文笔记' : '与 AI 一起读';
 }
 $('toggle').onclick = () => panel($('side').hidden ? 'chat' : 'closed');
 $('collapse').onclick = () => panel('closed'); $('ai').onclick = () => panel('chat');
 function showPaperNotes(){
-  renderClips($('paperClips'),paperId && 'paper:'+paperId);panel('notes');
+  if (!doc) {notice('请先打开一篇论文。');return;}
+  $('paperNotesTitle').textContent=$('title').textContent;
+  renderClips($('paperClips'),'paper:'+paperId);
+  $('paperNotesDialog').showModal();
 }
 $('note').onclick = showPaperNotes;
 function paperClip(turn,role){
@@ -252,7 +255,7 @@ async function openPDF(file,name,knownId,progress) {
     const resumePage=Number(localGet('reader.page.'+id))||1;
     updateTranslationAction(); $('translate').classList.remove('active');$('quote').hidden=true;$('scope').value='all';$('scope').options[2].disabled=true;
     $('messages').replaceChildren(welcome);$('question').value='';$('title').textContent=name;$('title').title=name;document.title=name+' · 研读';
-    if (!$('notesPane').hidden) renderClips($('paperClips'),'paper:'+paperId);
+    if ($('paperNotesDialog').open) $('paperNotesDialog').close();
     $('notes').value=localGet('reader.notes.'+doc.fingerprints[0])||'';$('noteStatus').textContent='更改自动保存在此浏览器。';
     pageNo=1; zoom=1;drawingWidth=0; $('pages').textContent=rows.length;$('page').max=rows.length;
     $('sheets').replaceChildren(...rows.map(e=>e.row));layout();go(resumePage);

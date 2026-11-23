@@ -251,8 +251,15 @@ function drawChat() {
 }
 
 $('courseNotes').onclick=()=>{
+  $('courseNotesTitle').textContent=project.name;
+  $('courseWriting').value=localGet('course.writing.'+project.id) || '';
+  $('courseSave').textContent='更改自动保存在此浏览器。';
   renderClips($('courseClips'),'course:'+project.id);
   $('courseNotesDialog').showModal();
+};
+$('courseWriting').oninput=()=>{
+  $('courseSave').textContent=localSet('course.writing.'+project.id,$('courseWriting').value) ?
+    '已保存在此浏览器。' : '笔记尚未保存，请检查浏览器存储空间。';
 };
 enableClipSelection(article=>{
   const turn=turns.find(t=>t.id===article.dataset.turnId && t.project===project?.id);
