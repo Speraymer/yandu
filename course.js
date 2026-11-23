@@ -3,10 +3,10 @@ import {enableClipSelection,renderClips} from './note-clips.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
 import {projects, newProject, projectRecords, addDeck, slideImage, setLearned, saveTurn} from './course-store.js?v=2';
-import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=3';
+import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js';
 import {formatMessage} from './answer.js?v=6';
-import {restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=3';
+import {restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=4';
 
 const $ = id => document.getElementById(id);
 function node(tag, text, cls) {
@@ -222,7 +222,7 @@ function drawChat() {
   if (!thread.length) {
     const w = node('section','');
     w.id = 'welcome';
-    w.append(node('h1','本页问答'),node('p','每页单独保存问答。提问时会参考这门课其他页的相关讨论。'));
+    w.append(node('h1','本页问答'),node('p','直接问这一页的概念、图或公式，也可以指定想比较的课件。'));
     log.append(w); return;
   }
   for (const t of thread) {

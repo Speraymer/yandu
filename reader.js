@@ -1,7 +1,7 @@
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js';
 import './pane-divider.js';
-import {recallTurns} from './course-context.js?v=3';
+import {recallTurns} from './course-context.js?v=4';
 import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
 import {configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=2';
@@ -38,7 +38,7 @@ function notice(message) {
 let provider = localGet('reader.provider') === 'openai' ? 'openai' : 'deepseek';
 const styleNames = {easier:'Easier Paper',direct:'简明答疑',review:'审稿式质询'};
 const stylePrompts = {
-  easier:'从读者的起点讲。整篇问题先串起研究矛盾、已有方法的局限、输入、方法、输出、实验和结论边界，再按自然单元逐步展开。局部问题聚焦指定句、图或公式与必要前提。首次出现的术语保留英文并解释，可以用一个简短例子，随后精确映射回原文。说明为什么这样设计、每个关键量如何变化，区分论文事实、作者解释、背景知识和学习推断。结尾视需要留一道可回答的自检问题。第二轮起，围绕本轮主题补充 2–5 个相邻概念、与主题的关系、理解后能推进什么，用简短分行展示。',
+  easier:'从读者的起点讲。整篇问题先串起研究矛盾、已有方法的局限、输入、方法、输出、实验和结论边界，再按自然单元逐步展开。局部问题聚焦指定句、图或公式与必要前提。首次出现的术语保留英文并解释，可以用一个简短例子，随后精确映射回原文。说明为什么这样设计、每个关键量如何变化，区分论文事实、作者解释、背景知识和学习推断。围绕提问讲到疑问解决为止。只有读者要求比较或理解本题确实需要前置概念时，才简短说明具体联系。',
   direct:'先用一句话回答问题，再用最少的必要步骤解释原因和证据。',
   review:'从主张、证据、可替代解释、适用边界四个角度评估。区分作者报告和仍需验证的内容。'
 };
