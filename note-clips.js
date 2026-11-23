@@ -15,7 +15,9 @@ export function loadClips(scope){
 }
 export function saveClip(scope,clip){
   const id=JSON.stringify([clip.turn,clip.role,clip.offset,clip.role>=2?clip.text:clip.text.length]);
-  localStorage.setItem(scopePrefix(scope)+id,JSON.stringify(clip));
+  const key=scopePrefix(scope)+id;
+  localStorage.setItem(key,JSON.stringify(clip));
+  return key;
 }
 export function renderClips(target,scope){
   target.replaceChildren();

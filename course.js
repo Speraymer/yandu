@@ -1,9 +1,10 @@
 import {onFileDrop} from './file-drop.js';
-import {enableClipSelection,renderClips} from './note-clips.js?v=2';
+import {enableClipSelection,renderClips} from './note-clips.js?v=3';
 import {slideTextLayer} from './slide-text.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
-import {projects, newProject, projectRecords, addDeck, restoreSlideSelection, slideImage, setLearned, saveTurn} from './course-store.js?v=4';
+import {projects, newProject, projectRecords, addDeck, restoreSlideSelection, slideImage, setLearned, saveTurn} from './course-store.js?v=5';
+import {exportCoursePack,importCoursePack} from './course-pack.js';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
@@ -43,6 +44,8 @@ function sync() {
   const ready = !!(deck && currentImage);
   $('courseNotes').disabled = !project;
   $('import').disabled = !project || importing;
+  $('coursePack').disabled = importing;
+  $('exportCourse').disabled = !project || importing;
   $('repairSelection').disabled=importing;
   $('projects').disabled = importing || !projectList.length;
   $('addProject').disabled = importing;
@@ -141,6 +144,42 @@ function projectDialog() {
   $('projectDialog').showModal(); $('projectName').focus();
 }
 $('addProject').onclick = projectDialog;
+$('coursePack').onclick = () => {
+  $('packScope').textContent = project ? '当前课程：'+project.name : '选择课程数据包可以恢复已有课程。';
+  $('packDialog').showModal();
+};
+$('importCourse').onclick = () => $('coursePackFile').click();
+async function transferCourse(file) {
+  if (importing) return;
+  if ($('packDialog').open) $('packDialog').close();
+  if (!file && decks.some(d=>Array.from(pending.keys()).some(key=>key.startsWith(d.id+'/')))) {
+    activity('当前课程还有问答正在生成，请在回复完成后导出。'); return;
+  }
+  importing=true; sync();
+  try {
+    if (file) {
+      activity('正在检查课程数据包…');
+      const restored=await importCoursePack(file,name=>activity('已校验课件：'+name));
+      // Opening a restored copy is not a page turn in the previous course.
+      clearImage();
+      await refreshProjects(restored.id);
+      activity('已导入课程「'+restored.name+'」。');
+    } else {
+      activity('正在打包课程…');
+      const {name,file:pack}=await exportCoursePack(project.id,name=>activity('已打包课件：'+name));
+      const url=URL.createObjectURL(pack), link=document.createElement('a');
+      link.href=url; link.download=(name.replace(/[<>:"/\\|?*]/g,'_') || '课程')+'.yanduc';
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      activity('已生成「'+name+'」的课程数据包。');
+    }
+  } finally { importing=false; sync(); }
+}
+action('exportCourse','click',()=>transferCourse());
+action('coursePackFile','change',()=>{
+  const file=$('coursePackFile').files[0]; $('coursePackFile').value='';
+  if (file) return transferCourse(file);
+});
 $('import').onclick = () => $('files').click();
 $('start').onclick = () => project ? $('files').click() : projectDialog();
 action('newProject','submit',async e => {
@@ -194,9 +233,13 @@ action('allNew','click',() => mark(null,false));
 
 let waitingFiles = [];
 $('projectDialog').addEventListener('close', () => { waitingFiles = []; });
-onFileDrop('松开以导入课程课件', files => {
+onFileDrop('松开以导入课件或课程数据包', files => {
   if (importing) return activity('正在导入课件，请等本批完成后再拖入。');
-  if (!files.length) return activity('请拖入 PPTX 或 PDF 文件。');
+  if (files.some(file=>/\.yanduc$/i.test(file.name))) {
+    if (files.length!==1) return activity('请单独拖入一份课程数据包。');
+    transferCourse(files[0]).catch(problem); return;
+  }
+  if (!files.length) return activity('请拖入课件或课程数据包。');
   if (!project) { waitingFiles = files; projectDialog(); return; }
   importFiles(files).catch(problem);
 });

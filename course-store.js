@@ -16,7 +16,9 @@ async function access(names, mode, fn) {
   const db = await database;
   return new Promise((resolve, reject) => {
     const tx = db.transaction(names, mode);
-    const request = fn(tx);
+    let request;
+    try { request = fn(tx); }
+    catch (error) { tx.abort(); reject(error); return; }
     tx.oncomplete = () => resolve(request?.result);
     tx.onabort = () => reject(tx.error || Error('存储事务中断。'));
   });
@@ -28,9 +30,41 @@ export const newProject = name => {
   return access('projects','readwrite',tx => tx.objectStore('projects').add(project)).then(() => project);
 };
 export const projectRecords = (store, project) => access(store,'readonly',tx =>
-  tx.objectStore(store).index('project').getAll(project)).then(rows => rows.sort((a,b) => a.time-b.time));
+  tx.objectStore(store).index('project').getAll(project)).then(rows => rows.sort(byTime));
 export const slideImage = (deck, page) => access('images','readonly',tx => tx.objectStore('images').get([deck,page]));
 export const saveTurn = turn => access('turns','readwrite',tx => tx.objectStore('turns').put(turn));
+
+// All records in an export come from one IndexedDB snapshot.
+export async function courseSnapshot(id) {
+  let project, decks, turns;
+  const pages = new Map();
+  await access(['projects','decks','turns','images'],'readonly',tx => {
+    const read = (request,receive) => { request.onsuccess = () => receive(request.result); };
+    read(tx.objectStore('projects').get(id),value => { project = value; });
+    read(tx.objectStore('turns').index('project').getAll(id),value => { turns = value; });
+    read(tx.objectStore('decks').index('project').getAll(id),value => {
+      decks = value.sort(byTime);
+      for (const deck of decks) {
+        const range = IDBKeyRange.bound([deck.id,1],[deck.id,deck.texts.length]);
+        read(tx.objectStore('images').getAll(range),images => pages.set(deck.id,images));
+      }
+    });
+  });
+  return {project,decks,turns:turns.sort(byTime),pages};
+}
+
+function byTime(a,b) { return a.time-b.time || (a.packOrder ?? 0)-(b.packOrder ?? 0); }
+
+export function storeCourseCopy(project,decks,turns,pages) {
+  return access(['projects','decks','turns','images'],'readwrite',tx => {
+    tx.objectStore('projects').add(project);
+    decks.forEach((deck,index) => {
+      tx.objectStore('decks').add(deck);
+      pages[index].forEach((value,i) => tx.objectStore('images').add(value,[deck.id,i+1]));
+    });
+    turns.forEach(turn => tx.objectStore('turns').add(turn));
+  });
+}
 
 export async function addDeck(project, name, pages) {
   const deck = {id:crypto.randomUUID(), project, name, time:Date.now(), texts:pages.map(p => p.text),
