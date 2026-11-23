@@ -1,4 +1,4 @@
-import {bindOrganizer} from './note-organizer.js?v=3';
+import {bindOrganizer} from './note-organizer.js?v=4';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips} from './note-clips.js?v=3';
 import {slideTextLayer} from './slide-text.js';
@@ -9,7 +9,7 @@ import {exportCoursePack,importCoursePack} from './course-pack.js';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
-import {defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=11';
+import {defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=12';
 
 const $ = id => document.getElementById(id);
 function node(tag, text, cls) {
