@@ -1,4 +1,4 @@
-import {courseSnapshot, storeCourseCopy, projects} from './course-store.js?v=5';
+import {courseSnapshot, storeCourseCopy, projects} from './course-store.js?v=6';
 import {loadClips, saveClip} from './note-clips.js?v=3';
 import {localGet, storageKey} from './reader-storage.js?v=2';
 

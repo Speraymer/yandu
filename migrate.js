@@ -1,4 +1,4 @@
-import {shelf,loadSaved,loadFile,mergeBook} from './library.js?v=5';
+import {shelf,loadSaved,loadFile,mergeBook} from './library.js?v=6';
 import {configureKey,hasKey,restoreKeys} from './model-api.js?v=2';
 
 const origin='http://127.0.0.1:18769';

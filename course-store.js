@@ -1,3 +1,5 @@
+import {storeBinary,readBinary} from './binary-storage.js';
+
 const database = new Promise((resolve, reject) => {
   const req = indexedDB.open('yandu-courses:' + new URL('.', import.meta.url).pathname, 1);
   req.onupgradeneeded = () => {
@@ -31,7 +33,14 @@ export const newProject = name => {
 };
 export const projectRecords = (store, project) => access(store,'readonly',tx =>
   tx.objectStore(store).index('project').getAll(project)).then(rows => rows.sort(byTime));
-export const slideImage = (deck, page) => access('images','readonly',tx => tx.objectStore('images').get([deck,page]));
+export const slideImage = (deck, page) => access('images','readonly',tx => tx.objectStore('images').get([deck,page])).then(readImage);
+
+async function storeImage(value) {
+  return value instanceof Blob ? storeBinary(value) : {...value,image:await storeBinary(value.image)};
+}
+function readImage(value) {
+  return value?.image ? {...value,image:readBinary(value.image)} : readBinary(value);
+}
 export const saveTurn = turn => access('turns','readwrite',tx => tx.objectStore('turns').put(turn));
 
 // All records in an export come from one IndexedDB snapshot.
@@ -46,7 +55,7 @@ export async function courseSnapshot(id) {
       decks = value.sort(byTime);
       for (const deck of decks) {
         const range = IDBKeyRange.bound([deck.id,1],[deck.id,deck.texts.length]);
-        read(tx.objectStore('images').getAll(range),images => pages.set(deck.id,images));
+        read(tx.objectStore('images').getAll(range),images => pages.set(deck.id,images.map(readImage)));
       }
     });
   });
@@ -55,12 +64,18 @@ export async function courseSnapshot(id) {
 
 function byTime(a,b) { return a.time-b.time || (a.packOrder ?? 0)-(b.packOrder ?? 0); }
 
-export function storeCourseCopy(project,decks,turns,pages) {
+export async function storeCourseCopy(project,decks,turns,pages) {
+  const stored = [];
+  for (const deckPages of pages) {
+    const images = [];
+    for (const value of deckPages) images.push(await storeImage(value));
+    stored.push(images);
+  }
   return access(['projects','decks','turns','images'],'readwrite',tx => {
     tx.objectStore('projects').add(project);
     decks.forEach((deck,index) => {
       tx.objectStore('decks').add(deck);
-      pages[index].forEach((value,i) => tx.objectStore('images').add(value,[deck.id,i+1]));
+      stored[index].forEach((value,i) => tx.objectStore('images').add(value,[deck.id,i+1]));
     });
     turns.forEach(turn => tx.objectStore('turns').add(turn));
   });
@@ -69,9 +84,11 @@ export function storeCourseCopy(project,decks,turns,pages) {
 export async function addDeck(project, name, pages) {
   const deck = {id:crypto.randomUUID(), project, name, time:Date.now(), texts:pages.map(p => p.text),
     learned:pages.map(() => false)};
+  const stored = [];
+  for (const {image,layout} of pages) stored.push(await storeImage({image,layout}));
   await access(['decks','images'],'readwrite',tx => {
     tx.objectStore('decks').add(deck);
-    pages.forEach(({image,layout},i) => tx.objectStore('images').add({image,layout},[deck.id, i+1]));
+    stored.forEach((value,i) => tx.objectStore('images').add(value,[deck.id, i+1]));
   });
   return deck;
 }
@@ -81,9 +98,11 @@ export async function restoreSlideSelection(deck,pages){
   if (pages.length!==deck.texts.length || pages.some((p,i)=>p.text!==deck.texts[i]))
     throw Error('原文件与当前课件的页数或文字不同，请选择导入时的文件。');
   if (!pages.some(p=>p.layout?.runs.length)) throw Error('原文件没有可定位的文字。');
+  const stored = [];
+  for (const {image,layout} of pages) stored.push(await storeImage({image,layout}));
   await access('images','readwrite',tx=>{
     const images=tx.objectStore('images');
-    pages.forEach(({image,layout},i)=>images.put({image,layout},[deck.id,i+1]));
+    stored.forEach((value,i)=>images.put(value,[deck.id,i+1]));
   });
 }
 

@@ -8,7 +8,7 @@ import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
 import {defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=12';
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
 import {formatMessage} from './answer.js?v=6';
-import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=5';
+import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=6';
 import {makeReadingPack,readReadingPack} from './reading-pack.js?v=3';
 import {contents} from './contents.js';
 import {classifyLayout,translatedBlocks} from './translation-layout.js';

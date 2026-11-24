@@ -1,3 +1,5 @@
+import {storeBinary,readBinary} from './binary-storage.js';
+
 // Paper metadata is separate from PDF bytes so listing a shelf never loads every PDF.
 let connection;
 function openLibrary(){
@@ -25,12 +27,13 @@ export async function transaction(stores,mode,operation){
   });
 }
 export const shelf=()=>transaction('books','readonly',tx=>tx.objectStore('books').getAll());
-export const loadFile=id=>transaction('files','readonly',tx=>tx.objectStore('files').get(id));
-export function rememberBook(book,blob){
+export const loadFile=id=>transaction('files','readonly',tx=>tx.objectStore('files').get(id)).then(readBinary);
+export async function rememberBook(book,blob){
+  const stored=await storeBinary(blob);
   return transaction(['books','files'],'readwrite',tx=>{
     tx.objectStore('books').put(book);
     const files=tx.objectStore('files'),known=files.getKey(book.id);
-    known.onsuccess=()=>{if(known.result===undefined)files.add(blob,book.id);};
+    known.onsuccess=()=>{if(known.result===undefined)files.add(stored,book.id);};
   });
 }
 export const loadSaved=(store,id)=>transaction(store,'readonly',tx=>tx.objectStore(store).index('paper').getAll(id));
@@ -46,14 +49,15 @@ export function savePage(record){
 }
 
 // Each record is compared and written within one transaction, including on retry.
-export function mergeBook(book,blob,pages,turns){
+export async function mergeBook(book,blob,pages,turns){
+  const stored=await storeBinary(blob);
   return transaction(['books','files','pages','turns'],'readwrite',tx=>{
     function upsert(store,key,value,accept,externalKey){
       const table=tx.objectStore(store),read=table.get(key);
       read.onsuccess=()=>{if(read.result===undefined||accept?.(read.result))externalKey?table.put(value,key):table.put(value);};
     }
     upsert('books',book.id,book);
-    upsert('files',book.id,blob,null,true);
+    upsert('files',book.id,stored,null,true);
     for(const page of pages)upsert('pages',[book.id,page.page],page,old=>!old.done&&(page.done||page.zh.length>old.zh.length));
     for(const turn of turns)upsert('turns',turn.id,turn,old=>{
       if(old.paper!==book.id){tx.abort();return false;}
