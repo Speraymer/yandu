@@ -19,6 +19,7 @@ function node(tag, text, cls) {
   return el;
 }
 function activity(text) {
+  $('packStatus').textContent = text;
   $('activity').textContent = text;
   $('activity').hidden = !text;
 }
@@ -48,6 +49,7 @@ function sync() {
   $('import').disabled = !project || importing;
   $('coursePack').disabled = importing;
   $('exportCourse').disabled = !project || importing;
+  $('importCourse').disabled = importing;
   $('repairSelection').disabled=importing;
   $('projects').disabled = importing || !projectList.length;
   $('addProject').disabled = importing;
@@ -153,7 +155,6 @@ $('coursePack').onclick = () => {
 $('importCourse').onclick = () => $('coursePackFile').click();
 async function transferCourse(file) {
   if (importing) return;
-  if ($('packDialog').open) $('packDialog').close();
   if (!file && decks.some(d=>Array.from(pending.keys()).some(key=>key.startsWith(d.id+'/')))) {
     activity('当前课程还有问答正在生成，请在回复完成后导出。'); return;
   }
@@ -165,7 +166,9 @@ async function transferCourse(file) {
       // Opening a restored copy is not a page turn in the previous course.
       clearImage();
       await refreshProjects(restored.id);
-      activity('已导入课程「'+restored.name+'」。');
+      if ($('packDialog').open) $('packDialog').close();
+      if (mobile.matches) $('side').hidden = true;
+      activity('已导入课程「'+restored.name+'」，共 '+decks.length+' 份课件、'+decks.reduce((n,d)=>n+d.texts.length,0)+' 页。');
     } else {
       activity('正在打包课程…');
       const {name,file:pack}=await exportCoursePack(project.id,name=>activity('已打包课件：'+name));

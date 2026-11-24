@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com https://agi.tongji.edu.cn; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>研读 · 课程学习</title><link rel="icon" href="./icons/book-open.svg">
 <link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css?v=3">
-<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=19"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
+<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=20"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
 <body class="course">
 <header><div class="brand"><img src="icons/book-open.svg" alt="">研读</div><a href="./">论文阅读</a><strong class="mode">课程学习</strong>
 <div class="project-picker"><select id="projects" aria-label="当前课程项目"></select><button id="addProject" disabled>新建项目</button><button id="coursePack" disabled>数据包</button></div>
@@ -36,8 +36,8 @@
 <h2><label for="courseWriting">笔记正文</label></h2><button type="button" id="editNotes" hidden>编辑正文</button><button type="button" id="undoNotes" hidden>撤销整理</button><section id="notesPreview" hidden></section><textarea id="courseWriting" placeholder="在这里写笔记…" rows="5"></textarea><small id="courseSave" role="status">更改自动保存在此浏览器。</small>
 </article></div></dialog>
 <dialog id="packDialog" aria-labelledby="packTitle"><form method="dialog" class="dialog-head"><h2 id="packTitle">课程数据包</h2><button aria-label="关闭">×</button></form>
-<p id="packScope"></p><p>数据包包含这门课的课件画面、划词、进度、逐页问答和笔记。导入会创建一个独立的课程项目。</p>
-<button id="exportCourse" class="primary">导出当前课程</button><button id="importCourse">导入课程数据包</button><input id="coursePackFile" type="file" accept=".yanduc" hidden></dialog>
+<p id="packScope"></p><p>数据包包含这门课的全部课件的逐页画面与文字、划词、进度、逐页问答和笔记，不含原始 PPTX/PDF 文件。请选择 .yanduc 课程数据包，导入会创建一个独立的课程项目。</p>
+<button id="exportCourse" class="primary">导出当前课程</button><button id="importCourse">导入课程数据包</button><input id="coursePackFile" type="file" hidden><p id="packStatus" role="status" aria-live="polite"></p></dialog>
 <dialog id="projectDialog"><form method="dialog" class="dialog-head"><h2>新建课程项目</h2><button aria-label="关闭">×</button></form><form id="newProject"><label>项目名称<input id="projectName" maxlength="80" required placeholder="例如：计算机组成原理"></label><p>同一项目的课件、学习进度和问答保存在此浏览器。</p><button class="primary">创建项目</button></form></dialog>
 <dialog id="settingDialog"><form method="dialog" class="dialog-head"><h2>课程问答设置</h2><button aria-label="关闭">×</button></form><form id="setup"><p><strong>Easier Paper 课件精读</strong><br>从当前页的问题讲起。问概念时解释含义，问图或公式时沿关键步骤展开。</p>
 <label>模型服务<select id="provider"><option value="deepseek">DeepSeek 官方</option><option value="openai">OpenAI 官方</option></select></label><label>模型名称<input id="model" maxlength="100" required pattern="[A-Za-z0-9._:\/\-]+"></label>
