@@ -19,7 +19,7 @@ export function saveClip(scope,clip){
   localStorage.setItem(key,JSON.stringify(clip));
   return key;
 }
-export function renderClips(target,scope){
+export function renderClips(target,scope,renderSlide){
   target.replaceChildren();
   if(!scope)return;
   try {
@@ -27,8 +27,10 @@ export function renderClips(target,scope){
     if(!clips.length){target.textContent='选中原文或问答中的文字，点「写入笔记」即可摘录。';return;}
     for(const c of clips){
       const item=document.createElement('section'), heading=document.createElement('small'), text=document.createElement('p');
-      heading.textContent=[c.book,c.page?'第 '+c.page+' 页':'全文',['提问','回答','原文','译文'][c.role]].filter(Boolean).join('　');
-      text.textContent=c.text;item.append(heading,text);target.append(item);
+      heading.textContent=[c.book,c.page?'第 '+c.page+' 页':'全文',['提问','回答','原文','译文','整页课件'][c.role]].filter(Boolean).join('　');
+      item.append(heading);target.append(item);
+      if(c.role===4 && renderSlide) renderSlide(item,c);
+      else {text.textContent=c.text;item.append(text);}
     }
   }catch{target.textContent='无法读取摘录，请检查浏览器存储权限。';}
 }

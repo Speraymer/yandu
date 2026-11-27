@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com https://agi.tongji.edu.cn; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>研读 · 课程学习</title><link rel="icon" href="./icons/book-open.svg">
 <link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css?v=3">
-<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=21"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
+<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=22"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
 <body class="course">
 <header><div class="brand"><img src="icons/book-open.svg" alt="">研读</div><a href="./">论文阅读</a><strong class="mode">课程学习</strong>
 <div class="project-picker"><select id="projects" aria-label="当前课程项目"></select><button id="addProject" disabled>新建项目</button><button id="coursePack" disabled>数据包</button></div>
@@ -18,7 +18,7 @@
 <img id="slide" draggable="false" alt="" hidden><div id="slideText" class="source-excerpt" hidden></div></div>
 <div id="repairBar" hidden><span>此课件需要补全文字位置，才能直接在画面上划词。</span><button id="repairSelection">选择原文件启用划词</button><input type="file" id="repairFile" accept=".pdf,.pptx" hidden></div>
 <details id="plainSource" hidden><summary>本页文字</summary><div id="plainBody" class="source-excerpt"></div></details>
-<div id="pageBar" hidden><div class="pager"><button id="prev" aria-label="上一页">‹</button><label>第 <input id="page" type="number" min="1" aria-label="跳至页码"> / <span id="count"></span> 页</label><button id="next" aria-label="下一页">›</button></div><label class="learned"><input type="checkbox" id="learned">本页已学</label><small id="deckStats"></small></div>
+<div id="pageBar" hidden><div class="pager"><button id="prev" aria-label="上一页">‹</button><label>第 <input id="page" type="number" min="1" aria-label="跳至页码"> / <span id="count"></span> 页</label><button id="next" aria-label="下一页">›</button></div><button id="saveSlide" disabled>整页写入笔记</button><label class="learned"><input type="checkbox" id="learned">本页已学</label><small id="deckStats"></small></div>
 <div id="activity" role="status" hidden></div>
 </section>
 <aside id="side"><div id="paneDivider" role="separator" tabindex="0" aria-label="课件与问答分栏宽度" aria-orientation="vertical" aria-controls="reading side"></div>

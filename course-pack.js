@@ -114,9 +114,9 @@ async function unpack(file,report) {
     byTurn.set(id,turn); return turn;
   });
   const clips = data.clips.map(c=>{
-    check(text(c.turn) && text(c.text) && natural(c.offset) && [0,1,2].includes(c.role));
+    check(text(c.turn) && text(c.text) && natural(c.offset) && [0,1,2,4].includes(c.role));
     let turn,book,order,time;
-    if (c.role===2) {
+    if (c.role===2 || c.role===4) {
       const match = /^source\/([^/]+)\/(\d+)$/.exec(c.turn);
       const deck = match && byDeck.get(match[1]);
       check(deck && Number(match[2])===c.page && pageIn(c.page,deck.texts.length));

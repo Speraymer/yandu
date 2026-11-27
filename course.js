@@ -1,11 +1,11 @@
 import {bindOrganizer} from './note-organizer.js?v=4';
 import {onFileDrop} from './file-drop.js';
-import {enableClipSelection,renderClips} from './note-clips.js?v=3';
+import {enableClipSelection,renderClips,saveClip} from './note-clips.js?v=4';
 import {slideTextLayer} from './slide-text.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
 import {projects, newProject, projectRecords, addDeck, restoreSlideSelection, slideImage, setLearned, saveTurn} from './course-store.js?v=6';
-import {exportCoursePack,importCoursePack} from './course-pack.js?v=2';
+import {exportCoursePack,importCoursePack} from './course-pack.js?v=3';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
@@ -45,6 +45,7 @@ const withImage = () => visionEnabled(provider);
 
 function sync() {
   const ready = !!(deck && currentImage);
+  $('saveSlide').disabled = !ready;
   $('courseNotes').disabled = !project;
   $('import').disabled = !project || importing;
   $('coursePack').disabled = importing;
@@ -334,6 +335,27 @@ function drawChat() {
   log.scrollTop = log.scrollHeight;
 }
 
+action('saveSlide','click',()=>{
+  if (!currentImage) return;
+  const {deck,page}=currentImage;
+  saveClip('course:'+project.id,{turn:'source/'+deck.id+'/'+page,role:4,offset:0,time:0,
+    order:deck.time,book:deck.name,page,text:deck.texts[page-1]});
+  activity('第 '+page+' 页已存入课程笔记的「原始摘录」。');
+});
+async function renderSlideClip(item,clip) {
+  const deckId=clip.turn.split('/')[1];
+  const img=document.createElement('img');
+  img.alt=clip.book+'，第 '+clip.page+' 页';
+  img.style.maxWidth='100%';
+  item.append(img);
+  try {
+    const stored=await slideImage(deckId,clip.page);
+    img.src=await dataUrl(stored?.image || stored);
+  } catch {
+    img.replaceWith(node('p','本页画面无法读取。'));
+  }
+}
+
 const prepareNotes = bindOrganizer({editor:$('courseWriting'),status:$('courseSave'),dialog:$('courseNotesDialog'),
   scope:()=>project && 'course:'+project.id, storage:()=>'course.writing.'+project.id, title:()=>$('courseNotesTitle').textContent,
   service:()=>({provider,model:modelFor(provider)})});
@@ -341,7 +363,7 @@ $('courseNotes').onclick=()=>{
   $('courseNotesTitle').textContent=project.name;
   $('courseWriting').value=localGet('course.writing.'+project.id) || '';
   $('courseSave').textContent='更改自动保存在此浏览器。';
-  renderClips($('courseClips'),'course:'+project.id);
+  renderClips($('courseClips'),'course:'+project.id,renderSlideClip);
   prepareNotes(); $('courseNotesDialog').showModal();
 };
 $('courseWriting').oninput=()=>{

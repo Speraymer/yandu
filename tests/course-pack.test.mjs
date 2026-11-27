@@ -10,7 +10,8 @@ test('course pack carries every slide image, text, progress and position without
   globalThis.packFixture={
     courseSnapshot:async()=>({project:{id:'p',name:'课程'},decks:[{id:'d',name:'讲义.pptx',time:1,texts:['第一页','第二页'],learned:[true,false]}],turns:[],pages:new Map([['d',[{image,layout:null},{image,layout:null}]]])}),
     storeCourseCopy:async(...args)=>{saved=args;},projects:async()=>[],
-    loadClips:()=>[],saveClip:()=>'',localGet:k=>values.get(k),storageKey:k=>k
+    loadClips:()=>[{turn:'source/d/2',role:4,page:2,offset:0,text:'第二页'}],
+    saveClip:(scope,clip)=>values.set(scope,clip),localGet:k=>values.get(k),storageKey:k=>k
   };
   const source=(await readFile(new URL('../course-pack.js',import.meta.url),'utf8'))
     .replace(/^import .*;$/gm,'');
@@ -25,6 +26,9 @@ test('course pack carries every slide image, text, progress and position without
   assert.equal(await pages[0][1].image.text(),'slide image bytes');
   assert.equal(values.get('course.page.'+decks[0].id),'2');
   assert.equal(values.get('course.deck.'+project.id),decks[0].id);
+  const clip=values.get('course:'+project.id);
+  assert.equal(clip.role,4);
+  assert.equal(clip.turn,'source/'+decks[0].id+'/2');
   const damaged=new Uint8Array(await file.arrayBuffer());damaged[damaged.length-1]^=1;
   await assert.rejects(api.importCoursePack(new Blob([damaged])),/画面校验失败/);
   delete globalThis.packFixture;delete globalThis.localStorage;
