@@ -30,6 +30,10 @@ test('the vision request attaches the pinned page, text requests stay text-only'
     await configureKey(provider,'test-only');
     await complete({provider,model:'test',course:true,context:'当前页',question:'解释图',image});
   }
+  await complete({provider:'deepseek',model:'deepseek-flash',course:true,question:'解释图',context:'',image});
+  await complete({provider:'deepseek',model:'deepseek-flash',course:true,question:'解释文字',context:''});
+  assert.equal(bodies[2].at(-1).content[1].image_url.url,image);
+  assert.equal(typeof bodies[3].at(-1).content,'string');
   assert.equal(bodies[0].at(-1).content[1].image_url.url,image);
   assert.equal(typeof bodies[1].at(-1).content,'string');
   assert.match(bodies[0][0].content,/课程辅导/);

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com https://agi.tongji.edu.cn; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>研读 · 课程学习</title><link rel="icon" href="./icons/book-open.svg">
 <link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css?v=3">
-<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=22"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
+<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=23"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
 <body class="course">
 <header><div class="brand"><img src="icons/book-open.svg" alt="">研读</div><a href="./">论文阅读</a><strong class="mode">课程学习</strong>
 <div class="project-picker"><select id="projects" aria-label="当前课程项目"></select><button id="addProject" disabled>新建项目</button><button id="coursePack" disabled>数据包</button></div>
@@ -42,7 +42,7 @@
 <dialog id="settingDialog"><form method="dialog" class="dialog-head"><h2>课程问答设置</h2><button aria-label="关闭">×</button></form><form id="setup"><p><strong>Easier Paper 课件精读</strong><br>从当前页的问题讲起。问概念时解释含义，问图或公式时沿关键步骤展开。</p>
 <label>模型服务<select id="provider"><option value="deepseek">DeepSeek 官方</option><option value="openai">OpenAI 官方</option></select></label><label>模型名称<input id="model" maxlength="100" required pattern="[A-Za-z0-9._:\/\-]+"></label>
 <label>API Key<input type="password" id="key" autocomplete="off" maxlength="1024"></label><label class="remember-choice"><input type="checkbox" id="remember">在此浏览器记住密钥</label><small id="keyHelp"></small><button type="button" id="forgetKey">忘记此密钥</button>
-<label class="remember-choice" id="visionOption"><input type="checkbox" id="vision">提问时附上当前页图片</label>
+<label class="remember-choice" id="visionOption"><input type="checkbox" id="vision">提问时附上当前页图片</label><small id="visionHelp" hidden>使用 deepseek-flash 可开启课件识图。</small>
 <p>提问会向所选服务发送本页内容、同课程相关摘录、学习进度、本页最近问答以及同课程其他页的相关问答摘录。读图需要支持图片输入的模型，调用计入你的账户。</p>
 <p class="error" id="configError" role="alert"></p><button class="primary">应用设置</button></form></dialog>
 </body></html>
