@@ -1,4 +1,3 @@
-import {bindModelChoices} from './model-choices.js?v=3';
 import {bindOrganizer} from './note-organizer.js?v=7';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,loadClips,saveClip} from './note-clips.js?v=2';
@@ -6,7 +5,7 @@ import './pane-divider.js';
 import {recallTurns} from './course-context.js?v=4';
 import {localGet,localSet} from './reader-storage.js';
 import {segmentsFor, bindParts, validatedPairs} from './alignment.js';
-import {selectedProvider, defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=15';
+import {defaultModel, configureKey, complete, hasKey, remembersKey, restoreKeys, forgetKey} from './model-api.js?v=15';
 import {selectedAnswer,answerRange,visibleAnswerPoint} from './answer-quotes.js?v=6';
 import {formatMessage} from './answer.js?v=6';
 import {shelf,loadFile,rememberBook,loadSaved,savePage,saveTurn,mergeBook} from './library.js?v=6';
@@ -36,7 +35,7 @@ function notice(message) {
   $('notice').textContent = message; $('notice').hidden = false;
   clearTimeout(flashTimer); flashTimer = setTimeout(() => $('notice').hidden = true, 5500);
 }
-let provider = selectedProvider(localGet('reader.provider'));
+let provider = localGet('reader.provider') === 'openai' ? 'openai' : 'deepseek';
 const styleNames = {easier:'Easier Paper',direct:'简明答疑',review:'审稿式质询'};
 const stylePrompts = {
   easier:'从读者的起点讲。整篇问题先串起研究矛盾、已有方法的局限、输入、方法、输出、实验和结论边界，再按自然单元逐步展开。局部问题聚焦指定句、图或公式与必要前提。首次出现的术语保留英文并解释，可以用一个简短例子，随后精确映射回原文。说明为什么这样设计、每个关键量如何变化，区分论文事实、作者解释、背景知识和学习推断。围绕提问讲到疑问解决为止。只有读者要求比较或理解本题确实需要前置概念时，才简短说明具体联系。',
@@ -121,13 +120,12 @@ $('notes').oninput = () => {
   if (doc) $('noteStatus').textContent = localSet('reader.notes.'+doc.fingerprints[0],$('notes').value) ? '已保存在此浏览器。' : '浏览器存储已满，笔记尚未保存。';
 };
 if(matchMedia('(max-width:740px)').matches) panel('closed');
-const resetChoices=bindModelChoices($('configProvider'));
 function configFields() {
   const p = $('configProvider').value; $('model').value = modelFor(p); $('key').value = '';
   $('rememberKey').checked = remembersKey(p);
   $('forgetKey').hidden = !hasKey(p);
   $('keyHelp').textContent = remembersKey(p) ? '此服务的密钥已保存在当前浏览器，重新打开可继续使用。' : hasKey(p) ? '此标签页的论文与课程共用此密钥。' : '填入所选服务商的个人 API Key。';
-  $('key').required = false; $('configError').textContent = ''; resetChoices();
+  $('key').required = false; $('configError').textContent = '';
 }
 async function settings() { await keyLoad; $('configProvider').value = provider; configFields(); $('style').value=styleChoice(); $('depth').value=localGet('reader.depth')||'learn'; $('preferences').value=localGet('reader.preferences')||''; $('settingDialog').showModal(); }
 $('settings').onclick = settings;
@@ -147,7 +145,7 @@ $('setup').onsubmit = async e => {
   const p = $('configProvider').value, key = $('key').value.trim();
   try {
     await configureKey(p,key,$('rememberKey').checked);
-    localSet('reader.model.'+p,(p==='tongji' ? $('modelChoices').value : $('model').value.trim())); provider = p; localSet('reader.provider',p);
+    localSet('reader.model.'+p,$('model').value.trim()); provider = p; localSet('reader.provider',p);
     for(const k of ['style','depth','preferences'])localSet('reader.'+k,$(k).value);
     $('key').value=''; $('settingDialog').close(); status();
   } catch(err){$('configError').textContent=err instanceof DOMException ? '密钥设置未保存。请检查浏览器存储权限，或取消勾选后仅在本次使用。' : err.message;}
