@@ -1,4 +1,5 @@
-import {bindOrganizer} from './note-organizer.js?v=5';
+import {bindModelChoices} from './model-choices.js?v=2';
+import {bindOrganizer} from './note-organizer.js?v=6';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,saveClip} from './note-clips.js?v=4';
 import {slideTextLayer} from './slide-text.js';
@@ -9,7 +10,7 @@ import {exportCoursePack,importCoursePack} from './course-pack.js?v=3';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=2';
 import {formatMessage} from './answer.js?v=6';
-import {supportsCourseImage, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=13';
+import {supportsCourseImage, selectedProvider, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=14';
 
 const $ = id => document.getElementById(id);
 function node(tag, text, cls) {
@@ -38,11 +39,11 @@ $('question').oninput = () => {
   if ($('question').value) drafts.set(chatKey(),$('question').value);
   else drafts.delete(chatKey());
 };
-let provider = localGet('reader.provider') === 'openai' ? 'openai' : 'deepseek';
+let provider = selectedProvider(localGet('reader.provider'));
 const modelFor = p => localGet('reader.model.' + p) || defaultModel(p);
 const visionKey = p => p === 'openai' ? 'course.vision' : 'course.vision.'+p;
 const visionEnabled = p => supportsCourseImage(p,modelFor(p)) &&
-  (p === 'deepseek' ? localGet(visionKey(p)) === 'true' : localGet(visionKey(p)) !== 'false');
+  (p !== 'openai' ? localGet(visionKey(p)) === 'true' : localGet(visionKey(p)) !== 'false');
 const withImage = () => visionEnabled(provider);
 
 function sync() {
@@ -383,6 +384,7 @@ enableClipSelection(article=>{
 });
 
 const keyLoad = restoreKeys().catch(() => activity('已保存的密钥读取失败，可在 AI 设置中填写。'));
+const resetChoices=bindModelChoices($('provider'));
 function fields() {
   const p = $('provider').value;
   $('model').value = modelFor(p); $('key').value = ''; $('remember').checked = remembersKey(p);
@@ -390,7 +392,7 @@ function fields() {
   $('vision').checked = p === 'openai' ? localGet(visionKey(p)) !== 'false' : localGet(visionKey(p)) === 'true';
   updateVisionOption();
   $('keyHelp').textContent = remembersKey(p) ? '密钥已保存在此浏览器。' : hasKey(p) ? '此标签页的论文与课程共用此密钥。' : '请输入个人 API Key。';
-  $('configError').textContent = '';
+  $('configError').textContent = ''; resetChoices();
 }
 function updateVisionOption() {
   const available=supportsCourseImage($('provider').value,$('model').value.trim());
@@ -411,7 +413,7 @@ action('setup','submit',async e => {
   try {
     await configureKey(p,$('key').value.trim(),$('remember').checked);
     provider = p;
-    localSet('reader.provider',p); localSet('reader.model.'+p,$('model').value.trim());
+    localSet('reader.provider',p); localSet('reader.model.'+p,p==='tongji' ? $('modelChoices').value : $('model').value.trim());
     if (!$('vision').disabled) localSet(visionKey(p),String($('vision').checked));
     $('settingDialog').close(); sync();
   } catch(err) { $('configError').textContent = err.message; }

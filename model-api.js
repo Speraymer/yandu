@@ -92,7 +92,7 @@ export async function tongjiModels(input) {
   }
   const {data} = await response.json();
   const ids = Array.isArray(data) ? data.map(item=>item?.id).filter(id=>typeof id==='string' && id.trim()) : [];
-  if (!ids.length) throw Error('平台未列出可用模型，可以手动填写平台提供的模型 ID。');
+  if (!ids.length) throw Error('平台未列出可用模型，请检查账号的模型权限。');
   return [...new Set(ids)];
 }
 
@@ -109,19 +109,29 @@ export async function complete({provider, model, question, context, history = []
   ];
   const payload = {model, messages, stream: false};
   if (provider === 'deepseek' && model === 'deepseek-flash') payload.thinking = {type: 'disabled'};
+  return sendCompletion(provider,payload,keys.get(provider),!!(course && image));
+}
+
+export function testTongjiModel(model,input) {
+  const key=input || keys.get('tongji');
+  validateKey('tongji',key || '');
+  return sendCompletion('tongji',{model,messages:[{role:'user',content:'1 加 1 等于几？请只回答数字。'}],stream:false},key,false);
+}
+
+async function sendCompletion(provider,payload,key,withImage) {
   let response;
   try {
     response = await fetch(services[provider], {
       method: 'POST', redirect: 'error', credentials: 'omit', referrerPolicy: 'no-referrer',
-      headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + keys.get(provider)},
+      headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + key},
       body: JSON.stringify(payload), signal: AbortSignal.timeout(150000),
     });
   } catch (error) {
     throw Error(error.name === 'TimeoutError' ? '模型响应超时，请稍后再试。' : '浏览器无法连接所选模型服务，请检查网络和服务可用地区。');
   }
   if (!response.ok) {
-    if (provider === 'tongji') await tongjiError(response,model);
-    const hints = {400:course && image ? '请检查模型名称和图片输入支持，或关闭附图后再提问。' : '请检查模型名称或缩小提问范围。',401:'API Key 无效，请在 AI 设置中重新填写。',402:'模型账户余额不足。',403:'账户或所在地区无权使用该模型。',404:'请检查模型名称。',429:'请检查账户额度或稍后再试。'};
+    if (provider === 'tongji') await tongjiError(response,payload.model);
+    const hints = {400:withImage ? '请检查模型名称和图片输入支持，或关闭附图后再提问。' : '请检查模型名称或缩小提问范围。',401:'API Key 无效，请在 AI 设置中重新填写。',402:'模型账户余额不足。',403:'账户或所在地区无权使用该模型。',404:'请检查模型名称。',429:'请检查账户额度或稍后再试。'};
     throw Error('模型服务返回 ' + response.status + '。' + (hints[response.status] || '请稍后再试。'));
   }
   const result = await response.json();

@@ -1,4 +1,4 @@
-import {complete,hasKey} from './model-api.js?v=13';
+import {complete,hasKey} from './model-api.js?v=14';
 import {loadClips} from './note-clips.js?v=3';
 import {formatMessage} from './answer.js?v=7';
 import {localGet,localSet} from './reader-storage.js';
