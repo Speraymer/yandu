@@ -131,7 +131,8 @@ async function unpack(file,report) {
     }
     return {turn,book,order,time,page:c.page,role:c.role,offset:c.offset,text:c.text};
   });
-  return {project,decks,turns,pages,positions,clips,writing:data.writing,active:byDeck.get(data.active)?.id};
+  return {project,decks,turns,pages,positions,clips,writing:data.writing.replace(/^\[\[课件图:source\/([^/\]\s]+)\/(\d+)\]\]/gm,
+    (marker,id,page)=>byDeck.has(id)?'[[课件图:source/'+byDeck.get(id).id+'/'+page+']]':marker),active:byDeck.get(data.active)?.id};
 }
 
 export async function importCoursePack(file,report) {

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com https://agi.tongji.edu.cn; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>研读 · 课程学习</title><link rel="icon" href="./icons/book-open.svg">
 <link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css?v=4">
-<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=25"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
+<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=figures1"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
 <body class="course">
 <header><div class="brand"><img src="icons/book-open.svg" alt="">研读</div><a href="./">论文阅读</a><strong class="mode">课程学习</strong>
 <div class="project-picker"><select id="projects" aria-label="当前课程项目"></select><button id="addProject" disabled>新建项目</button><button id="coursePack" disabled>数据包</button></div>
@@ -30,7 +30,7 @@
 <button class="mobile-only" id="openChat">课程问答</button>
 </main>
 <dialog class="notebook" id="courseNotesDialog" aria-labelledby="courseNotesTitle">
-<form method="dialog" class="notebook-bar"><strong>课程笔记</strong><button type="button" id="organizeNotes">一键整理</button><button aria-label="关闭笔记">返回阅读</button></form>
+<form method="dialog" class="notebook-bar"><strong>课程笔记</strong><button type="button" id="organizeNotes" title="整理整页摘录时，会将原图及同课件相邻页的文字或画面发送给所选模型，用于生成图注。">一键整理</button><button aria-label="关闭笔记">返回阅读</button></form>
 <div class="notebook-desk"><article class="notebook-paper"><h1 id="courseNotesTitle"></h1>
 <details id="clipDrawer"><summary>原始摘录</summary><section class="note-clips" id="courseClips"></section></details>
 <h2><label for="courseWriting">笔记正文</label></h2><button type="button" id="editNotes" hidden>编辑正文</button><button type="button" id="undoNotes" hidden>撤销整理</button><section id="notesPreview" hidden></section><textarea id="courseWriting" placeholder="在这里写笔记…" rows="5"></textarea><small id="courseSave" role="status">更改自动保存在此浏览器。</small>

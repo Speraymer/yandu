@@ -1,17 +1,18 @@
 import {slideLinkLayer} from './course-links.js';
-import {bindModelChoices} from './model-choices.js?v=2';
-import {bindOrganizer} from './note-organizer.js?v=6';
+import {bindModelChoices} from './model-choices.js?v=3';
+import {displayCourseFigures,organizeCourseFigures,describeSlide} from './course-note-figures.js';
+import {bindOrganizer} from './note-organizer.js?v=7';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,saveClip} from './note-clips.js?v=4';
 import {slideTextLayer} from './slide-text.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
 import {projects, newProject, projectRecords, addDeck, restoreSlideSelection, slideImage, setLearned, saveTurn} from './course-store.js?v=7';
-import {exportCoursePack,importCoursePack} from './course-pack.js?v=4';
+import {exportCoursePack,importCoursePack} from './course-pack.js?v=5';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
 import {readSlides} from './course-import.js?v=3';
 import {formatMessage} from './answer.js?v=6';
-import {supportsCourseImage, selectedProvider, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=14';
+import {supportsCourseImage, selectedProvider, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=15';
 
 const $ = id => document.getElementById(id);
 function node(tag, text, cls) {
@@ -374,7 +375,14 @@ async function renderSlideClip(item,clip) {
   }
 }
 
-const prepareNotes = bindOrganizer({editor:$('courseWriting'),status:$('courseSave'),dialog:$('courseNotesDialog'),
+const prepareNotes = bindOrganizer({
+  renderFigures:(target,writing,clips,format)=>displayCourseFigures(target,writing,clips,format,renderSlideClip),
+  organizeFigures:args=>organizeCourseFigures({...args,describe:(clip,config)=>describeSlide(clip,config,
+    decks.find(d=>d.id===clip.turn.split('/')[1]),async(id,n)=>{
+      const stored=await slideImage(id,n);
+      if (!stored)throw Error('无法读取第 '+n+' 页的画面。');
+      return dataUrl(stored.image || stored);
+    })}),editor:$('courseWriting'),status:$('courseSave'),dialog:$('courseNotesDialog'),
   scope:()=>project && 'course:'+project.id, storage:()=>'course.writing.'+project.id, title:()=>$('courseNotesTitle').textContent,
   service:()=>({provider,model:modelFor(provider)})});
 $('courseNotes').onclick=()=>{
