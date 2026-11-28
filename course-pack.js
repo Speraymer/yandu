@@ -1,4 +1,5 @@
-import {courseSnapshot, storeCourseCopy, projects} from './course-store.js?v=6';
+import {validateLinks} from './course-links.js';
+import {courseSnapshot, storeCourseCopy, projects} from './course-store.js?v=7';
 import {loadClips, saveClip} from './note-clips.js?v=3';
 import {localGet, storageKey} from './reader-storage.js?v=2';
 
@@ -37,7 +38,7 @@ export async function exportCoursePack(id,report) {
       const bare = item instanceof Blob;
       const image = bare ? item : item?.image;
       check(image instanceof Blob && image.size,'课件中有无法读取的页面。');
-      slots.push({size:image.size,type:image.type,hash:await imageHash(image),bare,layout:item.layout ?? null});
+      slots.push({size:image.size,type:image.type,hash:await imageHash(image),bare,layout:item.layout ?? null,...(item.linksVersion===1?{linksVersion:1,links:validateLinks(item.links,texts.length)}:{})});
       images.push(image);
     }
     data.decks.push({id,name,time,texts,learned,manualUnread:texts.map((_,i)=>!!manualUnread[i]),
@@ -93,7 +94,9 @@ async function unpack(file,report) {
       const image = file.slice(offset,offset+slot.size,slot.type);
       check(await imageHash(image)===slot.hash,'课件画面校验失败，请重新传输文件。');
       const layout = layoutData(slot.layout);
-      images.push(slot.bare ? image : {image,layout});
+      check(slot.linksVersion===undefined || (slot.linksVersion===1 && !slot.bare));
+      const linked=slot.linksVersion===1?{linksVersion:1,links:validateLinks(slot.links,texts.length)}:{};
+      images.push(slot.bare ? image : {image,layout,...linked});
       offset += slot.size;
     }
     pages.push(images);

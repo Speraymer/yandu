@@ -3,8 +3,8 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com https://agi.tongji.edu.cn; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>研读 · 课程学习</title><link rel="icon" href="./icons/book-open.svg">
-<link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css?v=3">
-<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=23"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
+<link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css?v=4">
+<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=24"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
 <body class="course">
 <header><div class="brand"><img src="icons/book-open.svg" alt="">研读</div><a href="./">论文阅读</a><strong class="mode">课程学习</strong>
 <div class="project-picker"><select id="projects" aria-label="当前课程项目"></select><button id="addProject" disabled>新建项目</button><button id="coursePack" disabled>数据包</button></div>
@@ -15,8 +15,8 @@
 <div id="deckBar" hidden><section><small id="courseStats"></small><select id="decks" aria-label="当前课件"></select></section>
 <details id="deckMenu"><summary>整份标记</summary><div><button id="allLearned">整份设为已学</button><button id="allNew">整份设为未学</button></div></details></div>
 <div id="stage" title="用方向键或滚轮翻页，翻过的页面自动标为已学"><section id="empty"><img src="icons/library-big.svg" alt=""><h1 id="emptyTitle">从一门课程开始</h1><p id="emptyText">为这门课建一个项目，把每次上课的课件放在一起。</p><button id="start" disabled class="primary">新建课程项目</button></section>
-<img id="slide" draggable="false" alt="" hidden><div id="slideText" class="source-excerpt" hidden></div></div>
-<div id="repairBar" hidden><span>此课件需要补全文字位置，才能直接在画面上划词。</span><button id="repairSelection">选择原文件启用划词</button><input type="file" id="repairFile" accept=".pdf,.pptx" hidden></div>
+<img id="slide" draggable="false" alt="" hidden><div id="slideText" class="source-excerpt" hidden></div><div id="slideLinks" hidden></div></div>
+<div id="linkBar" hidden><span id="linkHint"></span></div><div id="repairBar" hidden><span>选择原文件可补全课件文字位置和链接，保留进度与问答。</span><button id="repairSelection">选择原文件补全</button><input type="file" id="repairFile" accept=".pdf,.pptx" hidden></div>
 <details id="plainSource" hidden><summary>本页文字</summary><div id="plainBody" class="source-excerpt"></div></details>
 <div id="pageBar" hidden><div class="pager"><button id="prev" aria-label="上一页">‹</button><label>第 <input id="page" type="number" min="1" aria-label="跳至页码"> / <span id="count"></span> 页</label><button id="next" aria-label="下一页">›</button></div><button id="saveSlide" disabled>整页写入笔记</button><label class="learned"><input type="checkbox" id="learned">本页已学</label><small id="deckStats"></small></div>
 <div id="activity" role="status" hidden></div>
@@ -36,7 +36,7 @@
 <h2><label for="courseWriting">笔记正文</label></h2><button type="button" id="editNotes" hidden>编辑正文</button><button type="button" id="undoNotes" hidden>撤销整理</button><section id="notesPreview" hidden></section><textarea id="courseWriting" placeholder="在这里写笔记…" rows="5"></textarea><small id="courseSave" role="status">更改自动保存在此浏览器。</small>
 </article></div></dialog>
 <dialog id="packDialog" aria-labelledby="packTitle"><form method="dialog" class="dialog-head"><h2 id="packTitle">课程数据包</h2><button aria-label="关闭">×</button></form>
-<p id="packScope"></p><p>数据包包含这门课的全部课件的逐页画面与文字、划词、进度、逐页问答和笔记，不含原始 PPTX/PDF 文件。请选择 .yanduc 课程数据包，导入会创建一个独立的课程项目。</p>
+<p id="packScope"></p><p>数据包包含这门课的全部课件的逐页画面与文字、链接、划词、进度、逐页问答和笔记，不含原始 PPTX/PDF 文件。请选择 .yanduc 课程数据包，导入会创建一个独立的课程项目。</p>
 <button id="exportCourse" class="primary">导出当前课程</button><button id="importCourse">导入课程数据包</button><input id="coursePackFile" type="file" hidden><p id="packStatus" role="status" aria-live="polite"></p></dialog>
 <dialog id="projectDialog"><form method="dialog" class="dialog-head"><h2>新建课程项目</h2><button aria-label="关闭">×</button></form><form id="newProject"><label>项目名称<input id="projectName" maxlength="80" required placeholder="例如：计算机组成原理"></label><p>同一项目的课件、学习进度和问答保存在此浏览器。</p><button class="primary">创建项目</button></form></dialog>
 <dialog id="settingDialog"><form method="dialog" class="dialog-head"><h2>课程问答设置</h2><button aria-label="关闭">×</button></form><form id="setup"><p><strong>Easier Paper 课件精读</strong><br>从当前页的问题讲起。问概念时解释含义，问图或公式时沿关键步骤展开。</p>

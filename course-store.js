@@ -85,7 +85,7 @@ export async function addDeck(project, name, pages) {
   const deck = {id:crypto.randomUUID(), project, name, time:Date.now(), texts:pages.map(p => p.text),
     learned:pages.map(() => false)};
   const stored = [];
-  for (const {image,layout} of pages) stored.push(await storeImage({image,layout}));
+  for (const {image,layout,links,linksVersion} of pages) stored.push(await storeImage({image,layout,links,linksVersion}));
   await access(['decks','images'],'readwrite',tx => {
     tx.objectStore('decks').add(deck);
     stored.forEach((value,i) => tx.objectStore('images').add(value,[deck.id, i+1]));
@@ -97,9 +97,9 @@ export async function addDeck(project, name, pages) {
 export async function restoreSlideSelection(deck,pages){
   if (pages.length!==deck.texts.length || pages.some((p,i)=>p.text!==deck.texts[i]))
     throw Error('原文件与当前课件的页数或文字不同，请选择导入时的文件。');
-  if (!pages.some(p=>p.layout?.runs.length)) throw Error('原文件没有可定位的文字。');
+  if (!pages.some(p=>p.layout?.runs.length || p.links?.length)) throw Error('原文件没有可定位的文字或链接。');
   const stored = [];
-  for (const {image,layout} of pages) stored.push(await storeImage({image,layout}));
+  for (const {image,layout,links,linksVersion} of pages) stored.push(await storeImage({image,layout,links,linksVersion}));
   await access('images','readwrite',tx=>{
     const images=tx.objectStore('images');
     stored.forEach((value,i)=>images.put(value,[deck.id,i+1]));

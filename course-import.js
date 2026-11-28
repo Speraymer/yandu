@@ -1,3 +1,4 @@
+import {capturePptxLinks,linkRects,linkTarget} from './course-links.js';
 import {captureText} from './slide-text.js';
 import {getDocument, GlobalWorkerOptions, TextLayer} from './pdfjs/pdf.min.mjs';
 
@@ -32,7 +33,24 @@ async function pdfPages(bytes, progress) {
       stage.style.setProperty('--total-scale-factor',viewport.scale);
       const layer=document.createElement('div');layer.className='textLayer';stage.replaceChildren(layer);
       await new TextLayer({container:layer,viewport,textContentSource:content}).render();
-      pages.push({text,layout:captureText(stage),image:await imageBlob(canvas)});
+      const links=[];
+      for (const a of await page.getAnnotations()) {
+        if (a.subtype!=='Link' || !a.rect) continue;
+        let nav;
+        if (a.url || a.unsafeUrl) nav={url:a.url || a.unsafeUrl};
+        else if (a.dest) {
+          const dest=typeof a.dest==='string'?await pdf.getDestination(a.dest):a.dest;
+          if (dest?.length) nav={slideIndex:typeof dest[0]==='number'?dest[0]:await pdf.getPageIndex(dest[0])};
+        } else if (a.action) {
+          const index={FirstPage:0,LastPage:pdf.numPages-1,NextPage:n,PrevPage:n-2}[a.action];
+          if (index!==undefined) nav={slideIndex:index};
+        }
+        const [x1,y1]=viewport.convertToViewportPoint(a.rect[0],a.rect[1]);
+        const [x2,y2]=viewport.convertToViewportPoint(a.rect[2],a.rect[3]);
+        links.push(...linkRects([{left:Math.min(x1,x2),top:Math.min(y1,y2),right:Math.max(x1,x2),bottom:Math.max(y1,y2)}],
+          {left:0,top:0,width:viewport.width,height:viewport.height},linkTarget(nav,pdf.numPages),a.title || ''));
+      }
+      pages.push({text,layout:captureText(stage),links,linksVersion:1,image:await imageBlob(canvas)});
       canvas.width = canvas.height = 0;
       page.cleanup();
     }
@@ -54,7 +72,8 @@ async function pptxPages(bytes, progress) {
   try {
     for (const [index, slide] of model.slides.entries()) {
       progress(index + 1, model.slides.length);
-      const handle = renderSlide(model, slide, {externalMedia:'block', pdfjs:{
+      let navigation;
+      const handle = renderSlide(model, slide, {externalMedia:'block',onNavigate:nav=>{navigation=nav;}, pdfjs:{
         moduleUrl:asset('./pdfjs/pdf.min.mjs'), workerUrl:GlobalWorkerOptions.workerSrc}});
       try {
         stage.replaceChildren(handle.element);
@@ -64,7 +83,8 @@ async function pptxPages(bytes, progress) {
         const canvas = await window.htmlToImage.toCanvas(handle.element, {
           skipFonts:true, backgroundColor:'#ffffff', pixelRatio:1800 / Math.max(model.width,model.height)
         });
-        pages.push({text:lines[index].join('\n'), layout:captureText(handle.element), image:await imageBlob(canvas)});
+        const links=capturePptxLinks(handle.element,model.slides.length,(...args)=>args.length?(navigation=args[0]):navigation);
+        pages.push({text:lines[index].join('\n'),layout:captureText(handle.element),links,linksVersion:1,image:await imageBlob(canvas)});
         canvas.width = canvas.height = 0;
       } finally { handle.dispose(); }
     }

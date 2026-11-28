@@ -1,13 +1,14 @@
+import {slideLinkLayer} from './course-links.js';
 import {bindOrganizer} from './note-organizer.js?v=5';
 import {onFileDrop} from './file-drop.js';
 import {enableClipSelection,renderClips,saveClip} from './note-clips.js?v=4';
 import {slideTextLayer} from './slide-text.js';
 import './pane-divider.js';
 import {localGet, localSet} from './reader-storage.js';
-import {projects, newProject, projectRecords, addDeck, restoreSlideSelection, slideImage, setLearned, saveTurn} from './course-store.js?v=6';
-import {exportCoursePack,importCoursePack} from './course-pack.js?v=3';
+import {projects, newProject, projectRecords, addDeck, restoreSlideSelection, slideImage, setLearned, saveTurn} from './course-store.js?v=7';
+import {exportCoursePack,importCoursePack} from './course-pack.js?v=4';
 import {courseContext, courseHistory, pageTurns, recallTurns} from './course-context.js?v=4';
-import {readSlides} from './course-import.js?v=2';
+import {readSlides} from './course-import.js?v=3';
 import {formatMessage} from './answer.js?v=6';
 import {supportsCourseImage, defaultModel, restoreKeys, configureKey, forgetKey, hasKey, remembersKey, complete} from './model-api.js?v=13';
 
@@ -84,7 +85,9 @@ function updateDeckOptions() {
   if (deck) $('decks').value = deck.id;
 }
 const drawSource = slideTextLayer($('slideText'));
+const drawLinks = slideLinkLayer($('slideLinks'),$('slide'),n=>showPage(n).catch(problem),activity);
 function clearImage() {
+  drawLinks([]);$('linkBar').hidden=true;
   drawSource(null); $('plainSource').hidden=true; $('plainBody').textContent='';
   if (currentImage && (currentImage.deck !== deck || currentImage.page !== page)) {
     const old = currentImage;
@@ -114,7 +117,10 @@ async function showPage(n) {
   $('slide').alt = deck.name + '，第 ' + page + ' 页。' + deck.texts[page-1].slice(0,300);
   $('slide').hidden = false;
   drawSource(stored.layout);
-  $('repairBar').hidden=!(stored instanceof Blob && deck.texts[page-1].trim());
+  const pageLinks=stored.links || [];drawLinks(pageLinks);
+  $('linkBar').hidden=!pageLinks.length;
+  $('linkHint').textContent='本页 '+pageLinks.length+' 处链接，轻点虚线框打开网页或跳页，拖动文字可划词。';
+  $('repairBar').hidden=stored.linksVersion===1 && !(stored instanceof Blob);
   $('slide').title=stored.layout?.runs.length?'拖选画面中的文字可写入笔记':'';
   $('plainSource').hidden=false;
   $('plainBody').textContent=deck.texts[page-1] || '本页没有可提取的文字。';
@@ -267,11 +273,11 @@ action('repairFile','change',async ()=>{
   if (!file || !target || importing) return;
   importing=true;sync();
   try {
-    activity('正在补全 '+target.name+' 的文字位置…');
+    activity('正在补全 '+target.name+' 的文字位置和链接…');
     const pages=await readSlides(file,(n,total)=>activity('正在处理第 '+n+' / '+total+' 页'));
     await restoreSlideSelection(target,pages);
     if(deck?.id===target.id)await showPage(page);
-    activity('已启用画面划词。拖选文字后可写入笔记。');
+    activity('已补全课件文字位置和链接，进度与问答保留。');
   } finally { importing=false;sync(); }
 });
 async function importFiles(files) {
@@ -286,7 +292,7 @@ async function importFiles(files) {
         activity('正在打开 ' + file.name + '…');
         const pages = await readSlides(file,(n,total) => activity('正在读取 ' + file.name + '，第 ' + n + ' / ' + total + ' 页'));
         const same=decks.filter(d=>d.name===file.name && d.texts.length===pages.length && d.texts.every((text,i)=>text===pages[i].text));
-        if(same.length===1 && await slideImage(same[0].id,1) instanceof Blob && pages.some(p=>p.layout?.runs.length)){
+        if(same.length===1 && pages.some(p=>p.layout?.runs.length || p.links?.length)){
           await restoreSlideSelection(same[0],pages);
           restored++;
           if(!first)first=same[0].id;
@@ -298,7 +304,7 @@ async function importFiles(files) {
       } catch(err) { errors.push(file.name + '：' + (err.name === 'QuotaExceededError' ? '浏览器存储空间不足。' : err.message)); }
     }
     if (first) await openDeck(first,first===deck?.id?page:undefined);
-    activity([added && '已导入 '+added+' 份课件。', restored && '已为 '+restored+' 份已有课件启用画面划词。', ...errors].filter(Boolean).join('　'));
+    activity([added && '已导入 '+added+' 份课件。', restored && '已为 '+restored+' 份已有课件补全文字位置和链接。', ...errors].filter(Boolean).join('　'));
   } finally { importing = false; sync(); }
 }
 
