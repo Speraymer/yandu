@@ -42,8 +42,12 @@ $('question').oninput = () => {
 let provider = selectedProvider(localGet('reader.provider'));
 const modelFor = p => localGet('reader.model.' + p) || defaultModel(p);
 const visionKey = p => p === 'openai' ? 'course.vision' : 'course.vision.'+p;
-const visionEnabled = p => supportsCourseImage(p,modelFor(p)) &&
-  (p !== 'openai' ? localGet(visionKey(p)) === 'true' : localGet(visionKey(p)) !== 'false');
+const prefersImage = p => p === 'tongji' ? localGet(visionKey(p)) === 'true' : localGet(visionKey(p)) !== 'false';
+const visionEnabled = p => supportsCourseImage(p,modelFor(p)) && prefersImage(p);
+$('includeSlide').onchange = () => {
+  localSet(visionKey(provider),String($('includeSlide').checked));
+  sync();
+};
 const withImage = () => visionEnabled(provider);
 
 function sync() {
@@ -75,7 +79,12 @@ function sync() {
   }
   $('send').disabled = !ready || pending.has(chatKey());
   $('scopeHint').textContent = deck ? '当前页：《' + deck.name + '》第 ' + page + ' 页' : '请先打开课件';
-  $('inputMode').textContent = withImage() ? '附本页图文' : deck && !deck.texts[page-1].trim() ? '本页无文字层；看图请在 AI 设置启用支持图片的模型。' : '发送可提取的文字';
+  const canAttach=supportsCourseImage(provider,modelFor(provider));
+  $('imageChoice').hidden=!canAttach || !deck;
+  $('includeSlide').disabled=!ready;
+  $('includeSlide').checked=withImage();
+  $('inputMode').textContent=!deck ? '' : !canAttach && provider==='deepseek' ? '当前模型仅发文字，识图可在 AI 设置选择 deepseek-flash。' :
+    withImage() ? '发送第 '+page+' 页图文' : '仅发送文字';
   $('keyStatus').textContent = pending.has(chatKey()) ? '正在回答…' :
     hasKey(provider) ? modelFor(provider) : '使用课程问答前，请填写 AI 设置。';
 }
@@ -389,7 +398,7 @@ function fields() {
   const p = $('provider').value;
   $('model').value = modelFor(p); $('key').value = ''; $('remember').checked = remembersKey(p);
   $('forgetKey').hidden = !hasKey(p);
-  $('vision').checked = p === 'openai' ? localGet(visionKey(p)) !== 'false' : localGet(visionKey(p)) === 'true';
+  $('vision').checked = prefersImage(p);
   updateVisionOption();
   $('keyHelp').textContent = remembersKey(p) ? '密钥已保存在此浏览器。' : hasKey(p) ? '此标签页的论文与课程共用此密钥。' : '请输入个人 API Key。';
   $('configError').textContent = ''; resetChoices();

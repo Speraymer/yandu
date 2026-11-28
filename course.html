@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' blob: data: https://api.deepseek.com https://api.openai.com https://agi.tongji.edu.cn; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>研读 · 课程学习</title><link rel="icon" href="./icons/book-open.svg">
 <link rel="stylesheet" href="./reader.css?v=3"><link rel="stylesheet" href="./study.css?v=5"><link rel="stylesheet" href="./katex/katex.min.css"><link rel="stylesheet" href="./theme.css?v=8"><link rel="stylesheet" href="./course.css?v=3">
-<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=tongji1"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
+<script src="./theme.js?v=2"></script><script defer src="./course-vendor/capture/html-to-image.js"></script><script type="module" src="./course.js?v=slide-vision2"></script><link rel="stylesheet" href="./notebook.css?v=3"></head>
 <body class="course">
 <header><div class="brand"><img src="icons/book-open.svg" alt="">研读</div><a href="./">论文阅读</a><strong class="mode">课程学习</strong>
 <div class="project-picker"><select id="projects" aria-label="当前课程项目"></select><button id="addProject" disabled>新建项目</button><button id="coursePack" disabled>数据包</button></div>
@@ -25,7 +25,7 @@
 <div class="side-head"><span>课程问答</span><button id="courseNotes" disabled>课程笔记</button><button class="mobile-only" id="closeChat">看课件</button></div>
 <div id="messages" aria-live="polite"></div>
 <form id="composer"><small id="scopeHint">请先打开课件</small><textarea id="question" rows="2" maxlength="6000" aria-label="课程问题" placeholder="问问这一页…"></textarea>
-<div class="compose-bottom"><small id="inputMode"></small><button id="send" type="submit" aria-label="发送问题" disabled><img src="icons/arrow-up.svg" alt=""></button></div></form>
+<div class="compose-bottom"><label id="imageChoice"><input id="includeSlide" type="checkbox">附当前页画面</label><small id="inputMode"></small><button id="send" type="submit" aria-label="发送问题" disabled><img src="icons/arrow-up.svg" alt=""></button></div></form>
 <div class="status" id="keyStatus"></div></aside>
 <button class="mobile-only" id="openChat">课程问答</button>
 </main>
